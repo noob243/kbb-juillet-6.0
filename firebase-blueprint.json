@@ -1,0 +1,299 @@
+{
+  "entities": {
+    "client": {
+      "title": "Client",
+      "description": "Un client du cabinet d'avocats",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "name": { "type": "string" },
+        "contact": { "type": "string" },
+        "cases": { "type": "number" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "secteur": { "type": "string" },
+        "siege": { "type": "string" },
+        "dirigeant": { "type": "string" },
+        "ref1_nom": { "type": "string" },
+        "ref1_phone": { "type": "string" },
+        "ref1_email": { "type": "string" },
+        "ref2_nom": { "type": "string" },
+        "ref2_phone": { "type": "string" },
+        "ref2_email": { "type": "string" },
+        "typeFacturation": { "type": "string" }
+      },
+      "required": ["id", "name", "contact"]
+    },
+    "case": {
+      "title": "Case",
+      "description": "Un dossier juridique",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "client": { "type": "string" },
+        "status": { "type": "string" },
+        "nextHearing": { "type": "string" },
+        "procedure": { "type": "string" },
+        "procedureInstance": { "type": "string" },
+        "procedureObjet": { "type": "string" },
+        "procedureDateDebut": { "type": "string" },
+        "procedureDateFin": { "type": "string" },
+        "procedureStatus": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "name", "client", "status"]
+    },
+    "event": {
+      "title": "Event",
+      "description": "Un événement ou audience",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string" },
+        "lieu": { "type": "string" },
+        "partenaires": { "type": "string" },
+        "publicCible": { "type": "string" },
+        "membresKBB": { "type": "string" },
+        "membresExternes": { "type": "string" },
+        "budgetPrevisionnel": { "type": "string" },
+        "budgetRealise": { "type": "string" },
+        "financement": { "type": "string" },
+        "sponsors": { "type": "string" }
+      },
+      "required": ["id", "name", "type", "date", "lieu"]
+    },
+    "avocat": {
+      "title": "Avocat",
+      "description": "Un avocat membre du cabinet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "firstOathDate": { "type": "string" },
+        "secondOathDate": { "type": "string" },
+        "onaNumber": { "type": "string" },
+        "cabinetStatus": { "type": "string" },
+        "serviceStartDate": { "type": "string" },
+        "serviceStatus": { "type": "string" },
+        "cabinetRole": { "type": "string" },
+        "phone": { "type": "string" },
+        "disciplinaryMeasures": { "type": "string" },
+        "mainBar": { "type": "string" },
+        "secondaryBar": { "type": "string" },
+        "maritalStatus": { "type": "string" },
+        "physicalAddress": { "type": "string" },
+        "hasChildren": { "type": "string" },
+        "childrenCount": { "type": "number" }
+      },
+      "required": ["id", "fullName", "firstOathDate", "onaNumber", "cabinetStatus", "serviceStatus", "phone"]
+    },
+    "task": {
+      "title": "Task",
+      "description": "Une tâche associée à un dossier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "name": { "type": "string" },
+        "caseId": { "type": "string" },
+        "lawyer": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "procedureLinked": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" }
+      },
+      "required": ["id", "name", "caseId", "lawyer", "dueDate", "status"]
+    },
+    "invoice": {
+      "title": "Invoice",
+      "description": "Une facture de dossier",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "caseId": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "caseId", "dueDate", "totalAmount", "paidAmount", "status"]
+    },
+    "personnel": {
+      "title": "Personnel",
+      "description": "Un membre du personnel administratif",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "role": { "type": "string" },
+        "category": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "serviceStartDate": { "type": "string" },
+        "serviceStatus": { "type": "string" },
+        "salary": { "type": "number" },
+        "maritalStatus": { "type": "string" },
+        "hasChildren": { "type": "string" },
+        "childrenCount": { "type": "number" },
+        "address": { "type": "string" },
+        "photo": { "type": "string" },
+        "disciplinaryMeasure": { "type": "string" },
+        "disciplinaryStatus": { "type": "string" }
+      },
+      "required": ["id", "fullName", "role", "email", "phone", "serviceStartDate", "serviceStatus", "salary"]
+    },
+    "fournisseur": {
+      "title": "Fournisseur",
+      "description": "Un fournisseur de biens ou services",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nomComplet": { "type": "string" },
+        "naturePrestation": { "type": "string" },
+        "designationPrestation": { "type": "string" },
+        "typeFacturation": { "type": "string" },
+        "periode": { "type": "string" },
+        "montant": { "type": "number" },
+        "adressePhysique": { "type": "string" },
+        "adresseMail": { "type": "string" },
+        "dirigeantPrincipal": { "type": "string" }
+      },
+      "required": ["id", "nomComplet", "naturePrestation", "typeFacturation", "montant"]
+    },
+    "correspondance": {
+      "title": "Correspondance",
+      "description": "Une correspondance (lettre, mise en demeure, e-mail) envoyée ou reçue par le cabinet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "type": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "recipientEmail": { "type": "string" },
+        "subject": { "type": "string" },
+        "content": { "type": "string" },
+        "status": { "type": "string" },
+        "author": { "type": "string" },
+        "caseId": { "type": "string" }
+      },
+      "required": ["id", "date", "type", "recipientName", "subject", "content", "status", "author"]
+    },
+    "auditLog": {
+      "title": "AuditLog",
+      "description": "Un log d'audit système pour la traçabilité des actions",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "actionType": { "type": "string" },
+        "module": { "type": "string" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "userEmail", "userName", "actionType", "module", "description"]
+    },
+    "presence": {
+      "title": "Presence",
+      "description": "Statut de présence en ligne de l'utilisateur",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "status": { "type": "string" },
+        "lastSeen": { "type": "string" }
+      },
+      "required": ["id"]
+    },
+    "chatMessage": {
+      "title": "ChatMessage",
+      "description": "Un message direct entre deux utilisateurs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "senderName": { "type": "string" },
+        "recipientEmail": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "time": { "type": "string" }
+      },
+      "required": ["id", "senderEmail", "recipientEmail", "text"]
+    },
+    "forumTopic": {
+      "title": "ForumTopic",
+      "description": "Un sujet de discussion du forum du cabinet",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "author": { "type": "string" },
+        "role": { "type": "string" },
+        "date": { "type": "string" },
+        "content": { "type": "string" },
+        "replies": { "type": "array" }
+      },
+      "required": ["id", "title", "category", "author", "content"]
+    }
+  },
+  "firestore": {
+    "clients": {
+      "schema": "client",
+      "description": "Collection de clients"
+    },
+    "cases": {
+      "schema": "case",
+      "description": "Collection de dossiers juridiques"
+    },
+    "events": {
+      "schema": "event",
+      "description": "Collection d'événements"
+    },
+    "avocats": {
+      "schema": "avocat",
+      "description": "Collection d'avocats"
+    },
+    "tasks": {
+      "schema": "task",
+      "description": "Collection de tâches"
+    },
+    "invoices": {
+      "schema": "invoice",
+      "description": "Collection de factures"
+    },
+    "personnels": {
+      "schema": "personnel",
+      "description": "Collection de personnels administratifs"
+    },
+    "fournisseurs": {
+      "schema": "fournisseur",
+      "description": "Collection de fournisseurs"
+    },
+    "correspondances": {
+      "schema": "correspondance",
+      "description": "Collection de correspondances"
+    },
+    "auditLogs": {
+      "schema": "auditLog",
+      "description": "Collection de logs d'audit"
+    },
+    "presences": {
+      "schema": "presence",
+      "description": "Collection de statuts de présence en ligne"
+    },
+    "chat_messages": {
+      "schema": "chatMessage",
+      "description": "Collection de messages directs"
+    },
+    "forum_topics": {
+      "schema": "forumTopic",
+      "description": "Collection de sujets du forum"
+    }
+  }
+}
