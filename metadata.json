@@ -1,0 +1,6 @@
+{
+  "name": "KBB App",
+  "description": "Application web et mobile pour la gestion complète de KBB App: clients, dossiers, audiences, facturation et documents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

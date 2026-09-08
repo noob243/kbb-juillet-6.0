@@ -1,0 +1,11 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[user]
+	name = noob243
+	email = jeremieshusu4@gmail.com
+[remote "origin"]
+	url = https://github.com/noob243/kbb-app-juillet-beta-5.0.git
+	fetch = +refs/heads/*:refs/remotes/origin/*

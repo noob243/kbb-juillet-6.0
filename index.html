@@ -1,0 +1,85 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KBB App</title>
+    <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1iDqWDdGtqUf3kv7ume7Q949IvgYGh-Hy" />
+    <link rel="shortcut icon" href="https://lh3.googleusercontent.com/d/1iDqWDdGtqUf3kv7ume7Q949IvgYGh-Hy" />
+    <link rel="apple-touch-icon" href="https://lh3.googleusercontent.com/d/1iDqWDdGtqUf3kv7ume7Q949IvgYGh-Hy" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class'
+      }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        margin: 0;
+        font-family: 'Inter', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        background-color: #f3f4f6; /* Light gray background */
+        transition: background-color 300ms ease;
+      }
+      html.dark body {
+        background-color: #090d16; /* Clean deep slate-950 bg */
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #1e293b;
+      }
+      html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #334155;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.98); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 250ms ease-out forwards;
+      }
+      @keyframes subtlePulse {
+        0%, 100% { left: 0%; width: 30%; }
+        50% { left: 70%; width: 30%; }
+      }
+      .animate-subtlePulse {
+        animation: subtlePulse 1.8s ease-in-out infinite;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://esm.run/@google/genai"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/jspdf-autotable@latest/dist/jspdf.plugin.autotable.js"></script>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
