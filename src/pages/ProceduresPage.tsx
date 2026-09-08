@@ -1,5 +1,6 @@
 import React, { FC, useState } from 'react';
-import { Case, CaseProcedure } from '../types';
+import { Case, CaseProcedure, AppUser } from '../types';
+import { canDeleteRecord } from '../services/rbacService';
 import PageContainer from '../components/PageContainer';
 import { FormField, FormInput, FormSelect } from '../components/common/FormControls';
 import { 
@@ -25,6 +26,7 @@ interface ProceduresPageProps {
   onUpdateCase: (updatedCase: Case) => void;
   searchQuery?: string;
   setSearchQuery?: (query: string) => void;
+  currentUser?: AppUser | null;
 }
 
 // Helper function to safely format dates without throwing RangeError
@@ -39,13 +41,15 @@ const formatDate = (dateStr?: string) => {
   }
 };
 
-const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, searchQuery: parentSearchQuery, setSearchQuery: parentSetSearchQuery }) => {
+const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, searchQuery: parentSearchQuery, setSearchQuery: parentSetSearchQuery, currentUser }) => {
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const searchQuery = parentSearchQuery !== undefined ? parentSearchQuery : localSearchQuery;
   const setSearchQuery = parentSetSearchQuery !== undefined ? parentSetSearchQuery : setLocalSearchQuery;
   const [statusFilter, setStatusFilter] = useState('All');
   const [displayLimit, setDisplayLimit] = useState<number>(40);
-  
+
+  const userCanDelete = canDeleteRecord(currentUser ?? null);
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProcedure, setEditingProcedure] = useState<CaseProcedure | null>(null);
@@ -404,9 +408,14 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
                   <Edit3 className="w-3.5 h-3.5" /> Modifier
                 </button>
                 <button 
-                  onClick={() => handleDelete(proc.id, proc.caseId)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-extrabold transition"
-                  title="Supprimer la procédure"
+                  onClick={() => userCanDelete && handleDelete(proc.id, proc.caseId)}
+                  disabled={!userCanDelete}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition border ${
+                    userCanDelete
+                    ? "bg-red-50 hover:bg-red-100 text-red-600 border-red-100 cursor-pointer"
+                    : "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed opacity-60"
+                  }`}
+                  title={userCanDelete ? "Supprimer la procédure" : "Droit de suppression non accordé"}
                 >
                   <Trash2 className="w-3.5 h-3.5" /> Supprimer
                 </button>

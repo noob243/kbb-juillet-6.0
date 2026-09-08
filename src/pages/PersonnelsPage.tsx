@@ -2,20 +2,24 @@ import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import PersonnelModal from '../components/modals/PersonnelModal';
 import { SearchIcon, AlertIcon, FolderIcon, PhoneIcon, MailIcon } from '../components/Icons';
-import { Personnel } from '../types';
+import { Personnel, AppUser } from '../types';
+import { canDeleteRecord } from '../services/rbacService';
 
 interface PersonnelsPageProps {
   personnels: Personnel[];
   onAddPersonnel: (personnel: Personnel, password?: string) => void;
   onDeletePersonnel: (id: string) => void;
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
+  currentUser?: AppUser | null;
 }
 
-const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, onDeletePersonnel, onSendEmail }) => {
+const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, onDeletePersonnel, onSendEmail, currentUser }) => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedPersonnel, setSelectedPersonnel] = useState<Personnel | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<'Tous' | 'Administratif' | 'Office'>('Tous');
+
+    const userCanDelete = canDeleteRecord(currentUser ?? null);
 
     const getServiceStatusClass = (status: string) => {
         switch (status) {
@@ -263,11 +267,17 @@ const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, o
                                                     </button>
                                                     <button 
                                                         onClick={() => {
-                                                            if (true) {
+                                                            if (userCanDelete) {
                                                                 onDeletePersonnel(person.id);
                                                             }
                                                         }}
-                                                        className="text-red-500 hover:text-red-700 font-bold text-2xs bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg transition"
+                                                        disabled={!userCanDelete}
+                                                        className={`font-bold text-2xs px-2.5 py-1.5 rounded-lg transition border ${
+                                                            userCanDelete
+                                                            ? "text-red-500 hover:text-red-700 bg-rose-50 hover:bg-rose-100 border-rose-100 cursor-pointer"
+                                                            : "text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed opacity-60"
+                                                        }`}
+                                                        title={userCanDelete ? `Supprimer ${person.fullName}` : "Droit de suppression non accordé"}
                                                     >
                                                         Supprimer
                                                     </button>

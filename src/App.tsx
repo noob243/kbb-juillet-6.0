@@ -1635,6 +1635,7 @@ function App() {
             onUpdateClient: handleUpdateClient, onUpdateCase: handleUpdateCase, onUpdateAvocat: handleUpdateAvocat, onUpdatePersonnel: handleUpdatePersonnel, onUpdateEvent: handleUpdateEvent, onUpdateTask: handleUpdateTask, onUpdateInvoice: handleUpdateInvoice, onUpdateFournisseur: handleUpdateFournisseur,
             onSendEmail: triggerEmail,
             onExportBackup: handleExportBackup,
+            currentUser: currentUserObj,
         };
 
         switch (currentPage) {
@@ -1645,9 +1646,9 @@ function App() {
             case 'Procedures': 
             case 'Procédures':
             case 'Procedure':
-                return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="procedures"><ProceduresPage cases={cases} onUpdateCase={handleUpdateCase} searchQuery={searchQuery} setSearchQuery={setSearchQuery} /></ProtectedGuard>;
-            case 'Evenements': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="events"><EventsPage events={filteredEvents} onAddEvent={handleAddEvent} onUpdateEvent={handleUpdateEvent} avocats={avocats} personnels={personnels} onSendEmail={triggerEmail} /></ProtectedGuard>;
-            case 'Agenda': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="agenda"><AgendaPage tasks={tasks} cases={filteredCases} lawyers={lawyerNames} avocats={avocats} onAddTask={handleAddTask} onUpdateTask={handleUpdateTask} events={filteredEvents} onSendEmail={triggerEmail} /></ProtectedGuard>;
+                return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="procedures"><ProceduresPage cases={cases} onUpdateCase={handleUpdateCase} searchQuery={searchQuery} setSearchQuery={setSearchQuery} currentUser={currentUserObj} /></ProtectedGuard>;
+            case 'Evenements': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="events"><EventsPage events={filteredEvents} onAddEvent={handleAddEvent} onUpdateEvent={handleUpdateEvent} avocats={avocats} personnels={personnels} onSendEmail={triggerEmail} currentUser={currentUserObj} /></ProtectedGuard>;
+            case 'Agenda': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="agenda"><AgendaPage tasks={tasks} cases={filteredCases} lawyers={lawyerNames} avocats={avocats} onAddTask={handleAddTask} onUpdateTask={handleUpdateTask} events={filteredEvents} onSendEmail={triggerEmail} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Chat': return (
                 <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="chat">
                     <ChatPage 
@@ -1671,9 +1672,9 @@ function App() {
                 </ProtectedGuard>
             );
             case 'Facturation': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="billing"><BillingPage invoices={invoices} cases={filteredCases} currentUserInfo={currentUserInfo} onAddInvoice={handleAddInvoice} onSendEmail={triggerEmail} clients={clients} /></ProtectedGuard>;
-            case 'Avocats': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="avocats"><AvocatsPage avocats={avocats} tasks={tasks} onAddAvocat={handleAddAvocat} onDeleteAvocat={handleDeleteAvocat} onSendEmail={triggerEmail} correspondances={correspondances} currentUserInfo={currentUserInfo} /></ProtectedGuard>;
-            case 'Personnels': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="personnels"><PersonnelsPage personnels={personnels} onAddPersonnel={handleAddPersonnel} onDeletePersonnel={handleDeletePersonnel} onSendEmail={triggerEmail} /></ProtectedGuard>;
-            case 'Fournisseurs': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="suppliers"><FournisseursPage fournisseurs={fournisseurs} onAddFournisseur={handleAddFournisseur} onDeleteFournisseur={handleDeleteFournisseur} onSendEmail={triggerEmail} /></ProtectedGuard>;
+            case 'Avocats': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="avocats"><AvocatsPage avocats={avocats} tasks={tasks} onAddAvocat={handleAddAvocat} onDeleteAvocat={handleDeleteAvocat} onSendEmail={triggerEmail} correspondances={correspondances} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
+            case 'Personnels': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="personnels"><PersonnelsPage personnels={personnels} onAddPersonnel={handleAddPersonnel} onDeletePersonnel={handleDeletePersonnel} onSendEmail={triggerEmail} currentUser={currentUserObj} /></ProtectedGuard>;
+            case 'Fournisseurs': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="suppliers"><FournisseursPage fournisseurs={fournisseurs} onAddFournisseur={handleAddFournisseur} onDeleteFournisseur={handleDeleteFournisseur} onSendEmail={triggerEmail} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Gestion': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="gestion_cabinet"><GestionPage {...pageProps} currentUser={currentUserObj} onSendEmail={triggerEmail} onAddToast={triggerToast} /></ProtectedGuard>;
             case 'AuditLogs':
             case 'Audit':

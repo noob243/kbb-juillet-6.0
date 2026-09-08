@@ -119,6 +119,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     };
 
     const handleDeleteCorrespondance = async (id: string) => {
+        if (!userCanDelete) {
+            props.onAddToast?.('error', "Accès restreint : Le droit de suppression doit être expressément octroyé dans la matrice des rôles pour votre profil.");
+            return;
+        }
         if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette correspondance ? Cette action est irréversible.")) {
             return;
         }
@@ -166,6 +170,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     };
 
     const handleDeleteProcedure = (procId: string, caseId: string) => {
+        if (!userCanDelete) {
+            props.onAddToast?.('error', "Accès restreint : Le droit de suppression doit être expressément octroyé dans la matrice des rôles pour votre profil.");
+            return;
+        }
         if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette procédure ? Cette action est irréversible.")) {
             return;
         }
@@ -729,7 +737,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeleteAvocat, item.id, 'avocat')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeleteAvocat, item.id, 'avocat')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer l'avocat" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -886,7 +901,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeleteClient, item.id, 'client')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeleteClient, item.id, 'client')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer le client" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -1011,7 +1033,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeleteCase, item.id, 'dossier')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeleteCase, item.id, 'dossier')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer le dossier" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -1221,7 +1250,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeletePersonnel, item.id, 'personnel')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeletePersonnel, item.id, 'personnel')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer le membre du personnel" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -1341,7 +1377,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeleteEvent, item.id, 'event')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeleteEvent, item.id, 'event')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer l'événement" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -1471,7 +1514,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeleteTask, item.id, 'task')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeleteTask, item.id, 'task')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer la tâche" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -1606,7 +1656,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeleteInvoice, item.id, 'invoice')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeleteInvoice, item.id, 'invoice')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer la facture" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -1746,7 +1803,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             >
                                                                 ⚙️ Détaillé
                                                             </button>
-                                                            <button onClick={() => handleDelete(props.onDeleteFournisseur, item.id, 'fournisseur')} className={deleteButtonClass}>Supprimer</button>
+                                                            <button
+                                                                onClick={() => handleDelete(props.onDeleteFournisseur, item.id, 'fournisseur')}
+                                                                className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer le fournisseur" : "Droit de suppression non accordé"}
+                                                            >
+                                                                Supprimer
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </>
@@ -1867,6 +1931,8 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             <button 
                                                                 onClick={() => handleDeleteCorrespondance(item.id)} 
                                                                 className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer la correspondance" : "Droit de suppression non accordé"}
                                                             >
                                                                 Supprimer
                                                             </button>
@@ -1998,6 +2064,8 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                             <button 
                                                                 onClick={() => handleDeleteProcedure(item.id, item.caseId)} 
                                                                 className={deleteButtonClass}
+                                                                disabled={!userCanDelete}
+                                                                title={userCanDelete ? "Supprimer la procédure" : "Droit de suppression non accordé"}
                                                             >
                                                                 Supprimer
                                                             </button>

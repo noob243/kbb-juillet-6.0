@@ -2,7 +2,8 @@ import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import AvocatModal from '../components/modals/AvocatModal';
 import { PhoneIcon, MailIcon, CalendarIcon, CourthouseIcon, SearchIcon, CheckIcon, AlertIcon } from '../components/Icons';
-import { Avocat, Task, Correspondance } from '../types';
+import { Avocat, Task, Correspondance, AppUser } from '../types';
+import { canDeleteRecord } from '../services/rbacService';
 
 interface AvocatsPageProps {
   avocats: Avocat[];
@@ -12,6 +13,7 @@ interface AvocatsPageProps {
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
   correspondances?: Correspondance[];
   currentUserInfo?: { email?: string; name?: string; role?: string };
+  currentUser?: AppUser | null;
 }
 
 export const isTaskAssignedToLawyer = (task: Task, lawyerName: string): boolean => {
@@ -42,7 +44,8 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
     onDeleteAvocat, 
     onSendEmail, 
     correspondances = [],
-    currentUserInfo 
+    currentUserInfo,
+    currentUser
 }) => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedAvocat, setSelectedAvocat] = useState<Avocat | null>(null);
@@ -76,6 +79,8 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
     const reportCompletedTasks = reportTasks.filter(t => t.status === 'Effectué');
     const reportPendingTasks = reportTasks.filter(t => t.status !== 'Effectué');
     const reportHalfCompletedTasks = reportTasks.filter(t => t.status === 'Effectué à moitié');
+
+    const userCanDelete = canDeleteRecord(currentUser ?? null);
 
     return (
         <>
@@ -216,9 +221,14 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                                         </button>
                                                         {onDeleteAvocat && (
                                                             <button
-                                                                onClick={() => onDeleteAvocat(avocat.id)}
-                                                                className="text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 p-1.5 rounded-xl transition cursor-pointer border border-rose-200"
-                                                                title={`Supprimer l'avocat ${avocat.fullName}`}
+                                                                onClick={() => userCanDelete && onDeleteAvocat(avocat.id)}
+                                                                disabled={!userCanDelete}
+                                                                className={`p-1.5 rounded-xl transition border ${
+                                                                    userCanDelete
+                                                                    ? "text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border-rose-200 cursor-pointer"
+                                                                    : "text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed opacity-60"
+                                                                }`}
+                                                                title={userCanDelete ? `Supprimer l'avocat ${avocat.fullName}` : "Droit de suppression non accordé pour votre profil"}
                                                             >
                                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3.5 h-3.5">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />

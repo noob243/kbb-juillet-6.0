@@ -2,19 +2,23 @@ import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import FournisseurModal from '../components/modals/FournisseurModal';
 import { SearchIcon, UsersIcon, TrashIcon, CourthouseIcon, PhoneIcon, BriefcaseIcon, MailIcon } from '../components/Icons';
-import { Fournisseur } from '../types';
+import { Fournisseur, AppUser } from '../types';
+import { canDeleteRecord } from '../services/rbacService';
 
 interface FournisseursPageProps {
   fournisseurs: Fournisseur[];
   onAddFournisseur: (fournisseur: Fournisseur) => void;
   onDeleteFournisseur: (id: string) => void;
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
+  currentUser?: AppUser | null;
 }
 
-const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFournisseur, onDeleteFournisseur, onSendEmail }) => {
+const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFournisseur, onDeleteFournisseur, onSendEmail, currentUser }) => {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedFournisseur, setSelectedFournisseur] = useState<Fournisseur | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const userCanDelete = canDeleteRecord(currentUser ?? null);
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('en-US', {
@@ -171,15 +175,20 @@ const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFourni
                                                             </button>
                                                             <button 
                                                                 onClick={() => {
-                                                                    if (true) {
+                                                                    if (userCanDelete) {
                                                                         onDeleteFournisseur(f.id);
                                                                         if (selectedFournisseur?.id === f.id) {
                                                                             setSelectedFournisseur(null);
                                                                         }
                                                                     }
                                                                 }}
-                                                                className="px-2 py-1 text-2xs text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition"
-                                                                title="Supprimer ce fournisseur"
+                                                                disabled={!userCanDelete}
+                                                                className={`px-2 py-1 text-2xs rounded-lg transition border ${
+                                                                    userCanDelete
+                                                                    ? "text-rose-600 hover:text-rose-800 bg-rose-50 border-rose-100 cursor-pointer"
+                                                                    : "text-gray-300 bg-gray-50 border-gray-100 cursor-not-allowed opacity-60"
+                                                                }`}
+                                                                title={userCanDelete ? "Supprimer ce fournisseur" : "Droit de suppression non accordé"}
                                                             >
                                                                 <TrashIcon className="w-3.5 h-3.5" />
                                                             </button>
