@@ -340,3 +340,53 @@ export async function exportListToPdf(
     }
   }
 }
+
+export async function exportElementToPdf(element: HTMLElement, filenamePrefix: string, captureWidth = 1060): Promise<void> {
+  const html2pdf = (window as any).html2pdf;
+  if (!html2pdf) {
+    window.print();
+    return;
+  }
+
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.querySelectorAll('[data-pdf-ignore]').forEach(node => node.remove());
+  clone.querySelectorAll('table').forEach(table => {
+    const headerCells = table.querySelectorAll('thead th');
+    if (headerCells.length > 0 && headerCells[headerCells.length - 1].textContent?.trim().toLowerCase() === 'actions') {
+      table.querySelectorAll('tr').forEach(row => row.lastElementChild?.remove());
+    }
+  });
+  clone.querySelectorAll<HTMLElement>('[class*="overflow-y-auto"], [class*="overflow-y-scroll"]').forEach(node => {
+    node.style.maxHeight = 'none';
+    node.style.height = 'auto';
+    node.style.overflowY = 'visible';
+  });
+  Object.assign(clone.style, {
+    position: 'absolute',
+    left: '-10000px',
+    top: '0',
+    width: `${captureWidth}px`,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    height: 'auto',
+    overflow: 'visible',
+    backgroundColor: '#ffffff'
+  });
+  document.body.appendChild(clone);
+
+  try {
+    await html2pdf().from(clone).set({
+      margin: 8,
+      filename: `${filenamePrefix}_${Date.now()}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 1200 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+      pagebreak: { mode: ['css', 'legacy'] }
+    }).save();
+  } catch (err) {
+    console.error('Error exporting page PDF:', err);
+    window.print();
+  } finally {
+    clone.remove();
+  }
+}

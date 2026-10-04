@@ -1,4 +1,4 @@
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC, useState, useEffect, useRef } from 'react';
 import PageContainer from '../components/PageContainer';
 import { UserIcon } from '../components/Icons';
 import { Client, Case, Event, Task, Invoice, Avocat, Personnel, Fournisseur, Correspondance, CaseProcedure } from '../types';
@@ -12,9 +12,9 @@ import { CabinetManagementTab } from '../components/admin/CabinetManagementTab';
 import { AppUser } from '../types/rbac';
 import { syncUsersWithFirestore } from '../services/userService';
 import { canDeleteRecord, isCaseContentMasked, canViewRestrictedCaseContent, canManageCaseConfidentiality } from '../services/rbacService';
-import { Lock, Unlock } from 'lucide-react';
+import { Download, Lock, Unlock } from 'lucide-react';
 import { TaskPriorityBadge } from '../components/common/TaskPriorityBadge';
-import { exportListToPdf, exportFicheToPdf } from '../utils/pdfExport';
+import { exportListToPdf, exportElementToPdf } from '../utils/pdfExport';
 
 interface GestionPageProps {
     clients: Client[];
@@ -206,6 +206,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     // Detailed edit states
     const [detailedEditingType, setDetailedEditingType] = useState<'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'invoice' | 'fournisseur' | 'correspondance' | 'procedure' | null>(null);
     const [detailedEditForm, setDetailedEditForm] = useState<any>(null);
+    const gestionContentRef = useRef<HTMLDivElement>(null);
 
     const startDetailedEdit = (type: 'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'invoice' | 'fournisseur' | 'correspondance' | 'procedure', item: any) => {
         setDetailedEditingType(type);
@@ -333,6 +334,31 @@ const GestionPage: FC<GestionPageProps> = (props) => {
         return String(text).toLowerCase().includes(searchTerm.toLowerCase());
     };
 
+    const downloadAttachment = async (file: { name?: string; content?: string }) => {
+        if (!file.content) return;
+        try {
+            const source = /^(data:|blob:|https?:\/\/)/i.test(file.content)
+                ? file.content
+                : `data:application/octet-stream;base64,${file.content}`;
+            const response = await fetch(source);
+            const blobUrl = URL.createObjectURL(await response.blob());
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = file.name || 'piece-jointe';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        } catch (error) {
+            const link = document.createElement('a');
+            link.href = file.content;
+            link.download = file.name || 'piece-jointe';
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.click();
+        }
+    };
+
     // Filter Avocats
     const filteredAvocats = props.avocats.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'avocat') return false;
@@ -420,7 +446,25 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     const [mainAdminTab, setMainAdminTab] = useState<'users' | 'cabinet' | 'database'>('users');
 
     return (
-        <PageContainer title="Panneau de Gestion et Administration RBAC">
+        <PageContainer
+            title="Panneau de Gestion et Administration RBAC"
+            extraHeaderActions={(
+                <button
+                    type="button"
+                    data-pdf-ignore
+                    onClick={() => {
+                        const page = gestionContentRef.current?.parentElement?.parentElement;
+                        if (page) void exportElementToPdf(page, 'gestion_kbb');
+                    }}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-[#15447c] hover:bg-blue-900 text-white text-xs font-black rounded-lg transition shadow-xs cursor-pointer"
+                    title="Exporter la vue Gérer en PDF en conservant sa disposition"
+                >
+                    <Download className="w-4 h-4" />
+                    <span>Exporter Gérer en PDF</span>
+                </button>
+            )}
+        >
+            <div ref={gestionContentRef}>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl max-w-5xl">
                 <div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 font-bold leading-relaxed">
@@ -431,6 +475,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                     <div className="flex shrink-0">
                         <button
                             id="btn-export-backup"
+                            data-pdf-ignore
                             onClick={props.onExportBackup}
                             className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-lg transition shadow-xs active:scale-95 cursor-pointer"
                             title="Exporter l'intégralité de la base de données locale en format JSON"
@@ -603,18 +648,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                     return (
                         <div className="flex flex-wrap gap-1 max-w-[150px]">
                             {files.map((file: any, idx: number) => (
-                                <a 
-                                    key={idx} 
-                                    href={file.content || '#'} 
-                                    download={file.name}
-                                    className="inline-flex items-center text-[9px] font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-100 px-1.5 py-0.5 rounded transition" 
-                                    title={`Télécharger : ${file.name} (${file.size || 'N/A'})`}
-                                    onClick={(e) => {
-                                        if (!file.content) e.preventDefault();
-                                    }}
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    disabled={!file.content}
+                                    onClick={() => void downloadAttachment(file)}
+                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-100 disabled:opacity-50 px-1.5 py-0.5 rounded transition"
+                                    title={file.content ? `Télécharger : ${file.name} (${file.size || 'N/A'})` : `Contenu indisponible : ${file.name}`}
                                 >
-                                    �� <span className="truncate max-w-[65px]">{file.name}</span>
-                                </a>
+                                    <Download className="w-3 h-3 shrink-0" />
+                                    <span className="truncate max-w-[65px]">{file.name}</span>
+                                </button>
                             ))}
                         </div>
                     );
@@ -2316,6 +2360,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
             )}
             </>
             )}
+            </div>
 
             {/* MODAL DE MODIFICATION DÉTAILLÉE (MODULAIRE ET PROPRE) */}
             {detailedEditingType && detailedEditForm && (
@@ -2323,6 +2368,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                     type={detailedEditingType}
                     item={detailedEditForm}
                     clients={props.clients}
+                    avocats={props.avocats}
                     onClose={closeDetailedEdit}
                     onSave={(updatedItem) => {
                         if (detailedEditingType === 'client') {
