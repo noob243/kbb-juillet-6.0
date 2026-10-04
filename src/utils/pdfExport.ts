@@ -431,6 +431,23 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
 
   const clone = element.cloneNode(true) as HTMLElement;
   const captureId = createPdfCaptureId(clone);
+  const safeCaptureWidth = Math.max(captureWidth, element.scrollWidth || 1200, element.getBoundingClientRect().width || 1200, 1200);
+
+  const removeOverflowConstraints = (node: HTMLElement) => {
+    node.style.maxHeight = 'none';
+    node.style.minHeight = 'auto';
+    node.style.height = 'auto';
+    node.style.maxWidth = 'none';
+    node.style.width = 'auto';
+    node.style.overflow = 'visible';
+    node.style.overflowX = 'visible';
+    node.style.overflowY = 'visible';
+    node.style.display = node.tagName === 'TABLE' ? 'table' : node.style.display || '';
+    if (node.tagName === 'IMG' || node.tagName === 'SVG') {
+      node.style.maxWidth = '100%';
+    }
+  };
+
   clone.querySelectorAll('[data-pdf-ignore]').forEach(node => node.remove());
   clone.querySelectorAll('table').forEach(table => {
     const headerCells = table.querySelectorAll('thead th');
@@ -438,11 +455,12 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
       table.querySelectorAll('tr').forEach(row => row.lastElementChild?.remove());
     }
   });
-  clone.querySelectorAll<HTMLElement>('[class*="overflow-y-auto"], [class*="overflow-y-scroll"]').forEach(node => {
-    node.style.maxHeight = 'none';
-    node.style.height = 'auto';
-    node.style.overflowY = 'visible';
+  clone.querySelectorAll<HTMLElement>('[class*="overflow-y-auto"], [class*="overflow-y-scroll"], [class*="overflow-hidden"], [class*="max-h-"], [style*="overflow: hidden"], [style*="overflow:hidden"]').forEach(node => {
+    removeOverflowConstraints(node);
   });
+  clone.querySelectorAll<HTMLElement>('*').forEach(node => removeOverflowConstraints(node));
+  removeOverflowConstraints(clone);
+
   const captureDimensions = getPdfRenderDimensions(element);
   Object.assign(clone.style, {
     position: 'relative',
@@ -451,14 +469,17 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
     clipPath: 'none',
     pointerEvents: 'none',
     zIndex: 'auto',
-    width: `${captureWidth}px`,
-    maxWidth: '100%',
+    width: `${safeCaptureWidth}px`,
+    minWidth: `${safeCaptureWidth}px`,
+    maxWidth: 'none',
     maxHeight: 'none',
     height: 'auto',
     overflow: 'visible',
     overflowX: 'visible',
     overflowY: 'visible',
-    backgroundColor: '#ffffff'
+    backgroundColor: '#ffffff',
+    transform: 'none',
+    scale: '1'
   });
   sanitizePdfCaptureElement(clone);
   document.body.appendChild(clone);
@@ -468,7 +489,7 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
       margin: 8,
       filename: `${filenamePrefix}_${Date.now()}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: createHtml2CanvasOptions(captureId, 1.5, Math.max(captureWidth, captureDimensions.width), captureDimensions.height),
+      html2canvas: createHtml2CanvasOptions(captureId, 1.5, Math.max(safeCaptureWidth, captureDimensions.width), Math.max(captureDimensions.height, 2200)),
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
       pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     }).save();
