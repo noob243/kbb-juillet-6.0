@@ -10,8 +10,6 @@ export interface AttachmentItem {
   content?: string;
 }
 
-const KBB_LOGO_URL = 'https://drive.google.com/uc?export=view&id=1iDqWDdGtqUf3kv7ume7Q949IvgYGh-Hy';
-
 export function formatFieldValue(val: any): string {
   if (val === null || val === undefined || val === '') return 'N/A';
   if (typeof val === 'boolean') return val ? 'Oui' : 'Non';
@@ -151,26 +149,22 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
   container.innerHTML = `
     <div style="border: 2px solid #15447c; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <!-- Header -->
-      <div style="position: relative; display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 2px solid #dfe7f3; padding: 0 0 16px; margin-bottom: 20px;">
-        <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 5px; border-radius: 999px; background: linear-gradient(180deg, #1d4ed8 0%, #7aa2ff 100%);"></div>
-        <div style="display: flex; align-items: center; gap: 14px; min-width: 0; padding-left: 16px;">
-          <div style="display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #edf4ff 100%); border: 1px solid rgba(21,68,124,0.12); box-shadow: 0 10px 24px rgba(21,68,124,0.10);">
-            <img src="${KBB_LOGO_URL}" alt="Logo KBB" referrerPolicy="no-referrer" style="width: 38px; height: 38px; object-fit: contain; border-radius: 10px;" />
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px;">
+        <div>
+          <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
+            🏛️ CABINET D'AVOCATS KBB SARL
           </div>
-          <div style="min-width: 0;">
-            <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.3px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              CABINET D'AVOCATS KBB LAW FIRM scp SARL
-            </div>
-            <div style="font-size: 10.5px; font-weight: 800; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 1.5px;">
-              Consoles & Données Unifiées
-            </div>
-            <div style="font-size: 9px; color: #64748b; margin-top: 4px;">
-              Réf / ID: <strong>${recordId}</strong> | Exporté le : ${exportDate}
-            </div>
+          <div style="font-size: 11px; font-weight: 700; color: #d97706; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px;">
+            Plateforme Métier & Traçabilité Juridique
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
+            Réf / ID: <strong>${recordId}</strong> | Exporté le : ${exportDate}
           </div>
         </div>
-        <div style="display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: #ffffff; padding: 8px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; box-shadow: 0 12px 20px rgba(30,58,138,0.25);">
-          ${titleText}
+        <div style="text-align: right;">
+          <div style="background-color: #15447c; color: #ffffff; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800; display: inline-block;">
+            ${titleText}
+          </div>
         </div>
       </div>
 
@@ -350,25 +344,19 @@ export async function exportListToPdf(
   container.innerHTML = `
     <div style="border: 2px solid #15447c; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <!-- Header -->
-      <div style="position: relative; display: flex; justify-content: space-between; align-items: center; gap: 16px; border-bottom: 2px solid #dfe7f3; padding: 0 0 16px; margin-bottom: 20px;">
-        <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 5px; border-radius: 999px; background: linear-gradient(180deg, #1d4ed8 0%, #7aa2ff 100%);"></div>
-        <div style="display: flex; align-items: center; gap: 14px; min-width: 0; padding-left: 16px;">
-          <div style="display: flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 16px; background: linear-gradient(135deg, #ffffff 0%, #edf4ff 100%); border: 1px solid rgba(21,68,124,0.12); box-shadow: 0 10px 24px rgba(21,68,124,0.10);">
-            <img src="${KBB_LOGO_URL}" alt="Logo KBB" referrerPolicy="no-referrer" style="width: 38px; height: 38px; object-fit: contain; border-radius: 10px;" />
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px;">
+        <div>
+          <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.5px;">
+            🏛️ CABINET D'AVOCATS KBB SARL
           </div>
-          <div style="min-width: 0;">
-            <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.3px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              CABINET D'AVOCATS KBB LAW FIRM scp SARL
-            </div>
-            <div style="font-size: 10.5px; font-weight: 800; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 1.5px;">
-              Consoles & Données Unifiées
-            </div>
-            <div style="font-size: 9px; color: #64748b; margin-top: 4px;">
-              Exporté le : ${exportDate} | Total enregistrements : <strong>${rows.length}</strong>
-            </div>
+          <div style="font-size: 11px; font-weight: 700; color: #d97706; margin-top: 2px; text-transform: uppercase;">
+            Consoles & Données Unifiées
+          </div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
+            Exporté le : ${exportDate} | Total enregistrements : <strong>${rows.length}</strong>
           </div>
         </div>
-        <div style="display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: #ffffff; padding: 8px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.8px; text-transform: uppercase; box-shadow: 0 12px 20px rgba(30,58,138,0.25);">
+        <div style="background-color: #15447c; color: #ffffff; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 800;">
           ${titleText}
         </div>
       </div>
@@ -443,23 +431,6 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
 
   const clone = element.cloneNode(true) as HTMLElement;
   const captureId = createPdfCaptureId(clone);
-  const safeCaptureWidth = Math.min(Math.max(captureWidth, 920), 1180);
-
-  const removeOverflowConstraints = (node: HTMLElement) => {
-    node.style.maxHeight = 'none';
-    node.style.minHeight = 'auto';
-    node.style.height = 'auto';
-    node.style.maxWidth = '100%';
-    node.style.width = '100%';
-    node.style.overflow = 'visible';
-    node.style.overflowX = 'visible';
-    node.style.overflowY = 'visible';
-    node.style.boxSizing = 'border-box';
-    if (node.tagName === 'IMG' || node.tagName === 'SVG') {
-      node.style.maxWidth = '100%';
-    }
-  };
-
   clone.querySelectorAll('[data-pdf-ignore]').forEach(node => node.remove());
   clone.querySelectorAll('table').forEach(table => {
     const headerCells = table.querySelectorAll('thead th');
@@ -467,43 +438,12 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
       table.querySelectorAll('tr').forEach(row => row.lastElementChild?.remove());
     }
   });
-  clone.querySelectorAll<HTMLElement>('[class*="overflow-y-auto"], [class*="overflow-y-scroll"], [class*="overflow-hidden"], [class*="max-h-"], [style*="overflow: hidden"], [style*="overflow:hidden"]').forEach(node => {
-    removeOverflowConstraints(node);
+  clone.querySelectorAll<HTMLElement>('[class*="overflow-y-auto"], [class*="overflow-y-scroll"]').forEach(node => {
+    node.style.maxHeight = 'none';
+    node.style.height = 'auto';
+    node.style.overflowY = 'visible';
   });
-  clone.querySelectorAll<HTMLElement>('*').forEach(node => removeOverflowConstraints(node));
-  removeOverflowConstraints(clone);
-
-  const header = document.createElement('div');
-  header.innerHTML = `
-    <div style="position:relative; display:flex; align-items:center; justify-content:space-between; gap:14px; width:100%; margin-bottom:18px; padding:14px 18px; border:1px solid #dfe7f3; border-radius:16px; background:linear-gradient(135deg,#f8fafc 0%,#edf4ff 100%); box-shadow:0 8px 24px rgba(15,23,42,0.06); box-sizing:border-box;">
-      <div style="position:absolute; left:0; top:0; bottom:0; width:5px; border-radius:16px 0 0 16px; background:linear-gradient(180deg,#1d4ed8 0%,#7aa2ff 100%);"></div>
-      <div style="display:flex; align-items:center; gap:12px; min-width:0; padding-left:12px;">
-        <div style="display:flex; align-items:center; justify-content:center; width:50px; height:50px; border-radius:14px; background:linear-gradient(135deg,#ffffff 0%,#edf4ff 100%); border:1px solid rgba(21,68,124,0.12); box-shadow:0 10px 20px rgba(21,68,124,0.10);">
-          <img src="${KBB_LOGO_URL}" alt="Logo KBB" referrerPolicy="no-referrer" style="width:34px; height:34px; object-fit:contain; border-radius:10px;" />
-        </div>
-        <div>
-          <div style="font-size: 14px; font-weight: 900; color: #15447c; letter-spacing: 0.5px; text-transform: uppercase;">CABINET D'AVOCATS KBB LAW FIRM scp SARL</div>
-          <div style="font-size: 9px; color: #64748b; font-weight: 800; letter-spacing: 1.4px; text-transform: uppercase; margin-top:3px;">Consoles & Données Unifiées</div>
-        </div>
-      </div>
-      <div style="font-size: 9px; color: #ffffff; font-weight: 800; background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); padding: 7px 11px; border-radius: 999px; white-space: nowrap; box-shadow: 0 10px 18px rgba(30,58,138,0.22);">Export PDF</div>
-    </div>
-  `;
-
-  const wrapper = document.createElement('div');
-  wrapper.style.width = '100%';
-  wrapper.style.maxWidth = `${safeCaptureWidth}px`;
-  wrapper.style.margin = '0 auto';
-  wrapper.style.background = '#ffffff';
-  wrapper.style.padding = '0';
-  wrapper.style.boxSizing = 'border-box';
-
-  wrapper.appendChild(header);
-  wrapper.appendChild(clone);
-
   const captureDimensions = getPdfRenderDimensions(element);
-  const renderWidth = Math.min(Math.max(captureDimensions.width, 1000), 1200);
-
   Object.assign(clone.style, {
     position: 'relative',
     left: 'auto',
@@ -511,37 +451,31 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
     clipPath: 'none',
     pointerEvents: 'none',
     zIndex: 'auto',
-    width: '100%',
+    width: `${captureWidth}px`,
     maxWidth: '100%',
     maxHeight: 'none',
     height: 'auto',
     overflow: 'visible',
     overflowX: 'visible',
     overflowY: 'visible',
-    backgroundColor: '#ffffff',
-    borderRadius: '0',
-    transform: 'none',
-    scale: '1'
+    backgroundColor: '#ffffff'
   });
-
   sanitizePdfCaptureElement(clone);
-  document.body.appendChild(wrapper);
+  document.body.appendChild(clone);
 
   try {
-    await html2pdf().from(wrapper).set({
-      margin: [8, 8, 12, 8],
+    await html2pdf().from(clone).set({
+      margin: 8,
       filename: `${filenamePrefix}_${Date.now()}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: createHtml2CanvasOptions(captureId, 1.3, renderWidth, Math.max(captureDimensions.height, 2600)),
+      html2canvas: createHtml2CanvasOptions(captureId, 1.5, Math.max(captureWidth, captureDimensions.width), captureDimensions.height),
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-      pagebreak: { mode: ['css', 'legacy'] }
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     }).save();
   } catch (err) {
     console.error('Error exporting page PDF:', err);
     window.print();
   } finally {
-    if (document.body.contains(wrapper)) {
-      wrapper.remove();
-    }
+    clone.remove();
   }
 }
