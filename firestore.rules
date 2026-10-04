@@ -1,0 +1,105 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+
+    // --- Default Deny ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Collections ---
+    match /auditLogs {
+      allow list, read: if isSignedIn();
+    }
+    match /auditLogs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /presences {
+      allow list, read, write: if isSignedIn();
+    }
+    match /presences/{userId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /users {
+      allow list, read, write: if isSignedIn();
+    }
+    match /users/{userId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /correspondances {
+      allow list, read, write: if isSignedIn();
+    }
+    match /correspondances/{docId} {
+      allow read, write: if isSignedIn();
+    }
+    match /cabinet_info {
+      allow list, read, write: if isSignedIn();
+    }
+    match /cabinet_info/{docId} {
+      allow read, write: if isSignedIn();
+    }
+    match /system_settings {
+      allow list, read, write: if isSignedIn();
+    }
+    match /system_settings/{docId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /clients {
+      allow list, read, write: if isSignedIn();
+    }
+    match /clients/{clientId} {
+      allow read, write: if isSignedIn();
+    }
+    match /cases {
+      allow list, read, write: if isSignedIn();
+    }
+    match /cases/{caseId} {
+      allow read, write: if isSignedIn();
+    }
+    match /events {
+      allow list, read, write: if isSignedIn();
+    }
+    match /events/{eventId} {
+      allow read, write: if isSignedIn();
+    }
+    match /avocats {
+      allow list, read, write: if isSignedIn();
+    }
+    match /avocats/{avocatId} {
+      allow read, write: if isSignedIn();
+    }
+    match /tasks {
+      allow list, read, write: if isSignedIn();
+    }
+    match /tasks/{taskId} {
+      allow read, write: if isSignedIn();
+    }
+    match /invoices {
+      allow list, read, write: if isSignedIn();
+    }
+    match /invoices/{invoiceId} {
+      allow read, write: if isSignedIn();
+    }
+    match /personnels {
+      allow list, read, write: if isSignedIn();
+    }
+    match /personnels/{personnelId} {
+      allow read, write: if isSignedIn();
+    }
+    match /fournisseurs {
+      allow list, read, write: if isSignedIn();
+    }
+    match /fournisseurs/{fournisseurId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
