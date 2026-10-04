@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">KBB App</string>
+    <string name="title_activity_main">KBB App</string>
+    <string name="package_name">cd.kbb.app</string>
+    <string name="custom_url_scheme">cd.kbb.app</string>
+</resources>
