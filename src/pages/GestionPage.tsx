@@ -1,5 +1,6 @@
-import React, { FC, useState, useEffect } from 'react';
+import React, { FC, useRef, useState, useEffect } from 'react';
 import PageContainer from '../components/PageContainer';
+import { exportElementToPdf } from '../utils/pdfExport';
 import { UserIcon } from '../components/Icons';
 import { Client, Case, Event, Task, Invoice, Avocat, Personnel, Fournisseur, Correspondance, CaseProcedure } from '../types';
 import { DetailedEditModal } from '../components/DetailedEditModal';
@@ -12,7 +13,7 @@ import { CabinetManagementTab } from '../components/admin/CabinetManagementTab';
 import { AppUser } from '../types/rbac';
 import { syncUsersWithFirestore } from '../services/userService';
 import { canDeleteRecord, isCaseContentMasked, canViewRestrictedCaseContent, canManageCaseConfidentiality } from '../services/rbacService';
-import { Lock, Unlock } from 'lucide-react';
+import { Download, Lock, Unlock } from 'lucide-react';
 import { TaskPriorityBadge } from '../components/common/TaskPriorityBadge';
 
 interface GestionPageProps {
@@ -48,6 +49,7 @@ interface GestionPageProps {
 }
 
 const GestionPage: FC<GestionPageProps> = (props) => {
+    const gestionContentRef = useRef<HTMLDivElement>(null);
     const userCanDelete = canDeleteRecord(props.currentUser ?? null);
     const tableHeaderClass = "p-3 font-extrabold text-2xs text-[#15447c] uppercase tracking-wider bg-slate-50 border-b border-gray-250";
     const tableCellClass = "p-3 text-xs text-gray-700 align-middle border-b border-gray-100";
@@ -419,8 +421,25 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     const [mainAdminTab, setMainAdminTab] = useState<'users' | 'cabinet' | 'database'>('users');
 
     return (
-        <PageContainer title="Panneau de Gestion et Administration RBAC">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl max-w-5xl">
+        <PageContainer
+            title="Panneau de Gestion et Administration RBAC"
+            extraHeaderActions={(
+                <button
+                    type="button"
+                    data-pdf-ignore
+                    onClick={() => {
+                        const page = gestionContentRef.current?.parentElement?.parentElement;
+                        if (page) void exportElementToPdf(page, 'gestion_kbb');
+                    }}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-[#15447c] hover:bg-blue-900 text-white text-xs font-black rounded-lg transition shadow-xs cursor-pointer"
+                    title="Exporter la vue Gérer en PDF en conservant sa disposition"
+                >
+                    <Download className="w-4 h-4" />
+                    <span>Exporter Gérer en PDF</span>
+                </button>
+            )}
+        >
+            <div ref={gestionContentRef} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl max-w-5xl">
                 <div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 font-bold leading-relaxed">
                         🛡️ <span className="text-[#15447c] dark:text-indigo-400 font-black">Console Administrateur KBB RBAC</span>. Gérez les rôles, catégories (Administratif vs Office), autorisations granulaires et archivage logique.
@@ -430,6 +449,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                     <div className="flex shrink-0">
                         <button
                             id="btn-export-backup"
+                            data-pdf-ignore
                             onClick={props.onExportBackup}
                             className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-lg transition shadow-xs active:scale-95 cursor-pointer"
                             title="Exporter l'intégralité de la base de données locale en format JSON"
