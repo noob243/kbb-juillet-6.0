@@ -30,25 +30,64 @@ function createPdfCaptureId(element: HTMLElement): string {
   return captureId;
 }
 
-function createHtml2CanvasOptions(captureId: string, scale: number, windowWidth?: number) {
+function getPdfRenderDimensions(element?: HTMLElement) {
+  const documentWidth = Math.max(document.documentElement?.scrollWidth || 0, document.body?.scrollWidth || 0, 1200);
+  const documentHeight = Math.max(document.documentElement?.scrollHeight || 0, document.body?.scrollHeight || 0, 1800);
+
+  if (!element) {
+    return { width: documentWidth, height: documentHeight };
+  }
+
+  const rect = element.getBoundingClientRect();
+  return {
+    width: Math.max(Math.ceil(rect.width || element.scrollWidth || documentWidth), documentWidth),
+    height: Math.max(Math.ceil(rect.height || element.scrollHeight || documentHeight), documentHeight)
+  };
+}
+
+function sanitizePdfCaptureElement(element: HTMLElement) {
+  const nodes = [element, ...Array.from(element.querySelectorAll<HTMLElement>('*'))];
+
+  nodes.forEach((node) => {
+    const style = node.style;
+    Object.assign(style, {
+      position: 'static',
+      left: 'auto',
+      top: 'auto',
+      right: 'auto',
+      bottom: 'auto',
+      zIndex: 'auto',
+      visibility: 'visible',
+      opacity: '1',
+      clipPath: 'none',
+      filter: 'none',
+      transform: 'none',
+      overflow: 'visible',
+      overflowX: 'visible',
+      overflowY: 'visible',
+      maxHeight: 'none',
+      maxWidth: '100%',
+      height: 'auto',
+      wordBreak: 'break-word',
+      whiteSpace: 'normal'
+    });
+  });
+}
+
+function createHtml2CanvasOptions(captureId: string, scale: number, windowWidth?: number, windowHeight?: number) {
+  const dimensions = getPdfRenderDimensions();
   return {
     scale,
     useCORS: true,
     logging: false,
-    ...(windowWidth ? { windowWidth } : {}),
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: windowWidth ?? Math.max(dimensions.width, window.innerWidth || 1200),
+    windowHeight: windowHeight ?? Math.max(dimensions.height, 1800),
     onclone: (clonedDocument: Document) => {
       const captureElement = clonedDocument.getElementById(captureId);
       if (captureElement) {
-        Object.assign(captureElement.style, {
-          position: 'static',
-          left: 'auto',
-          top: 'auto',
-          right: 'auto',
-          zIndex: 'auto',
-          visibility: 'visible',
-          opacity: '1',
-          clipPath: 'none'
-        });
+        sanitizePdfCaptureElement(captureElement);
       }
     }
   };
@@ -247,11 +286,12 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
   try {
     const html2pdf = (window as any).html2pdf;
     if (html2pdf) {
+      const captureDimensions = getPdfRenderDimensions(container);
       const opt = {
         margin: 8,
         filename: `fiche_${type}_${recordId}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: createHtml2CanvasOptions(captureId, 2),
+        html2canvas: createHtml2CanvasOptions(captureId, 2, captureDimensions.width, captureDimensions.height),
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
       await html2pdf().from(container).set(opt).save();
@@ -360,11 +400,12 @@ export async function exportListToPdf(
   try {
     const html2pdf = (window as any).html2pdf;
     if (html2pdf) {
+      const captureDimensions = getPdfRenderDimensions(container);
       const opt = {
         margin: 8,
         filename: `${filenamePrefix}_${Date.now()}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: createHtml2CanvasOptions(captureId, 2),
+        html2canvas: createHtml2CanvasOptions(captureId, 2, captureDimensions.width, captureDimensions.height),
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       };
       await html2pdf().from(container).set(opt).save();
@@ -402,20 +443,24 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
     node.style.height = 'auto';
     node.style.overflowY = 'visible';
   });
+  const captureDimensions = getPdfRenderDimensions(element);
   Object.assign(clone.style, {
     position: 'relative',
     left: 'auto',
     top: 'auto',
-    clipPath: 'inset(100%)',
+    clipPath: 'none',
     pointerEvents: 'none',
     zIndex: 'auto',
     width: `${captureWidth}px`,
-    maxWidth: 'none',
+    maxWidth: '100%',
     maxHeight: 'none',
     height: 'auto',
     overflow: 'visible',
+    overflowX: 'visible',
+    overflowY: 'visible',
     backgroundColor: '#ffffff'
   });
+  sanitizePdfCaptureElement(clone);
   document.body.appendChild(clone);
 
   try {
@@ -423,9 +468,9 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
       margin: 8,
       filename: `${filenamePrefix}_${Date.now()}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: createHtml2CanvasOptions(captureId, 1.5, 1200),
+      html2canvas: createHtml2CanvasOptions(captureId, 1.5, Math.max(captureWidth, captureDimensions.width), captureDimensions.height),
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-      pagebreak: { mode: ['css', 'legacy'] }
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
     }).save();
   } catch (err) {
     console.error('Error exporting page PDF:', err);
