@@ -1,6 +1,7 @@
 import React, { FC, useState, useEffect, useRef } from 'react';
 import { Case, Client, Avocat, Task, CaseProcedure } from '../../types';
 import { FormField, FormInput, FormSelect, FormTextarea, FormSectionHeader } from '../common/FormControls';
+import { exportFicheToPdf } from '../../utils/pdfExport';
 
 interface CaseModalProps {
   isOpen: boolean;
@@ -36,7 +37,7 @@ const CaseModal: FC<CaseModalProps> = ({
         status: 'En cours' as Case['status'],
         isContentMasked: false,
         isConfidential: false,
-        attachments: [] as File[],
+        attachments: [] as Array<{ name: string; size: string; content?: string }>,
         tags: [] as string[],
     };
 
@@ -87,7 +88,23 @@ const CaseModal: FC<CaseModalProps> = ({
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            setFormData(prev => ({ ...prev, attachments: [...prev.attachments, ...Array.from(e.target.files!)] }));
+            Array.from(e.target.files).forEach((file: any) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const sizeStr = file.size > 1024 * 1024
+                        ? (file.size / (1024 * 1024)).toFixed(1) + ' MB'
+                        : (file.size / 1024).toFixed(0) + ' KB';
+                    setFormData(prev => ({
+                        ...prev,
+                        attachments: [...prev.attachments, {
+                            name: file.name,
+                            size: sizeStr,
+                            content: reader.result as string
+                        }]
+                    }));
+                };
+                reader.readAsDataURL(file);
+            });
             e.target.value = ''; 
         }
     };
@@ -196,6 +213,7 @@ const CaseModal: FC<CaseModalProps> = ({
             tags: formData.tags,
             adversaires: formData.adversaires,
             adversaire: formData.adversaires.join(', '),
+            piecesJointes: formData.attachments,
         }, []);
 
         setFormData(initialFormState);
@@ -210,14 +228,35 @@ const CaseModal: FC<CaseModalProps> = ({
         ? formData.avocatTitulaire.split(',').map(item => item.trim()).filter(Boolean) 
         : [];
 
+    const handleDownloadPdf = () => {
+        try {
+            exportFicheToPdf('case', formData);
+        } catch (e) {
+            console.error("PDF error:", e);
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex justify-center items-center p-4">
             <div className="bg-white rounded-2xl shadow-2xl p-5 sm:p-6 md:p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-                    <h2 className="text-xl sm:text-2xl font-black text-gray-800">Créer un nouveau dossier</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-650 transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+                    <h2 className="text-xl sm:text-2xl font-black text-gray-800">Gestion / Fiche de Dossier</h2>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleDownloadPdf}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-blue-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger la fiche en PDF"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span>Télécharger PDF</span>
+                        </button>
+                        <button onClick={onClose} className="text-gray-400 hover:text-gray-650 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
                 </div>
                 <form onSubmit={handleSubmit}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
@@ -531,9 +570,21 @@ const CaseModal: FC<CaseModalProps> = ({
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                             <span className="text-gray-800 truncate border-b border-dashed" title={file.name}>{file.name}</span>
                                         </div>
-                                        <button type="button" onClick={() => handleRemoveAttachment(index)} className="ml-4 text-red-500 hover:text-red-700 h-6 w-6 flex items-center justify-center rounded-full hover:bg-red-100 flex-shrink-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            {file.content && (
+                                                <a
+                                                    href={file.content}
+                                                    download={file.name}
+                                                    className="text-indigo-600 hover:text-indigo-800 p-1 rounded hover:bg-indigo-50"
+                                                    title="Télécharger cette pièce jointe"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                                </a>
+                                            )}
+                                            <button type="button" onClick={() => handleRemoveAttachment(index)} className="text-red-500 hover:text-red-700 h-6 w-6 flex items-center justify-center rounded-full hover:bg-red-100 flex-shrink-0" title="Supprimer">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>

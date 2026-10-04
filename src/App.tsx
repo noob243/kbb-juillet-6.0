@@ -173,6 +173,11 @@ function App() {
 
     // Persist login session to sessionStorage
     useEffect(() => {
+        if (!auth.currentUser) {
+            signInAnonymously(auth).catch(err => {
+                console.warn("Anonymous sign-in note:", err);
+            });
+        }
         try {
             sessionStorage.setItem('kbb_auth', String(isAuthenticated));
             if (currentUserInfo) {

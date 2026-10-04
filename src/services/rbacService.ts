@@ -297,17 +297,13 @@ export function canViewFinancialStats(
   user: AppUser | Partial<AppUser> | { role?: string; email?: string; fullName?: string; name?: string; functionRole?: string; isSuperAdmin?: boolean; cabinetStatus?: string } | null | undefined,
   userInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null
 ): boolean {
-  const u = user || userInfo;
-  if (!u) return false;
-  if ((u as any).isDeleted) return false;
-  if ((u as any).hasAppAccess === false) return false;
-
-  const role = (u as any).role || userInfo?.role || '';
-  const email = (u as any).email || userInfo?.email || '';
-  const isSuperAdmin = (u as any).isSuperAdmin;
+  const effectiveUser = user || userInfo ? { ...(user || {}), ...(userInfo || {}) } : null;
+  if (!effectiveUser) return false;
+  if ((effectiveUser as any).isDeleted) return false;
+  if ((effectiveUser as any).hasAppAccess === false) return false;
 
   // 1. Tous les administrateurs
-  if (role === 'Admin' || isSuperAdmin === true || (typeof role === 'string' && role.toLowerCase().includes('admin'))) {
+  if (effectiveUser.role === 'Admin' || effectiveUser.isSuperAdmin === true || (typeof effectiveUser.role === 'string' && effectiveUser.role.toLowerCase().includes('admin'))) {
     return true;
   }
 
@@ -317,19 +313,19 @@ export function canViewFinancialStats(
     'patbonles@gmail.com',
     'admin@cabinet.com'
   ];
-  if (email && adminEmails.includes(email.toLowerCase().trim())) {
+  if (effectiveUser.email && adminEmails.includes(effectiveUser.email.toLowerCase().trim())) {
     return true;
   }
 
   // 2. Associés (Avocats Associés / Partners du cabinet)
-  const func = ((u as any).functionRole || userInfo?.functionRole || '').toLowerCase();
-  const cabStatus = ((u as any).cabinetStatus || '').toLowerCase();
-  const roleLower = typeof role === 'string' ? role.toLowerCase() : '';
+  const func = (effectiveUser.functionRole || '').toLowerCase();
+  const cabStatus = ((effectiveUser as any).cabinetStatus || '').toLowerCase();
+  const role = (effectiveUser.role || '').toLowerCase();
 
   if (
     func.includes('associé') || func.includes('associe') || func.includes('partner') ||
     cabStatus.includes('associé') || cabStatus.includes('associe') ||
-    roleLower.includes('associé') || roleLower.includes('associe')
+    role.includes('associé') || role.includes('associe')
   ) {
     return true;
   }

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Client, Case, Avocat, Personnel } from '../types';
 import { compressAndOptimizeImage, validateImageFile, ACCEPTED_IMAGE_INPUT_ACCEPT } from '../utils/imageOptimizer';
+import { exportFicheToPdf } from '../utils/pdfExport';
 
 interface DetailedEditModalProps {
   type: 'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'invoice' | 'fournisseur';
   item: any;
   clients: Client[];
+  avocats: Avocat[];
   onClose: () => void;
   onSave: (updatedItem: any) => void;
 }
@@ -14,6 +16,7 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
   type,
   item,
   clients,
+  avocats,
   onClose,
   onSave
 }) => {
@@ -24,6 +27,63 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
   const [editTagInput, setEditTagInput] = useState('');
   const [editAdversaryInput, setEditAdversaryInput] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const [openLawyerField, setOpenLawyerField] = useState<'avocatTitulaire' | 'avocatsSurDossier' | null>(null);
+
+  const selectedLawyers = (field: 'avocatTitulaire' | 'avocatsSurDossier') =>
+    String(formData[field] || '').split(',').map((name: string) => name.trim()).filter(Boolean);
+
+  const toggleLawyer = (field: 'avocatTitulaire' | 'avocatsSurDossier', name: string) => {
+    const selected = selectedLawyers(field);
+    handleFieldChange(field, selected.includes(name)
+      ? selected.filter((selectedName: string) => selectedName !== name).join(', ')
+      : [...selected, name].join(', '));
+  };
+
+  const renderLawyerSelector = (field: 'avocatTitulaire' | 'avocatsSurDossier', label: string, placeholder: string) => {
+    const selected = selectedLawyers(field);
+    const isOpen = openLawyerField === field;
+
+    return (
+      <div className="relative">
+        <label className="block text-[10px] font-extrabold uppercase tracking-wide text-gray-500 mb-1">{label}</label>
+        <div className="min-h-10 p-2 border border-slate-300 rounded-xl bg-white flex flex-wrap items-center gap-1.5">
+          {selected.map(name => (
+            <span key={name} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-100 text-[10px] font-bold">
+              {name}
+              <button type="button" onClick={() => toggleLawyer(field, name)} className="text-rose-600 font-black" aria-label={`Retirer ${name}`}>×</button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={() => setOpenLawyerField(isOpen ? null : field)}
+            className="text-left text-xs font-semibold text-slate-500 hover:text-[#15447c]"
+          >
+            {selected.length ? 'Ajouter / modifier' : placeholder}
+          </button>
+        </div>
+        {isOpen && (
+          <div className="absolute z-30 mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-xl p-3 max-h-48 overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-gray-100 pb-2 mb-2">
+              <span className="text-[10px] font-extrabold uppercase text-slate-500">Sélectionner les avocats</span>
+              <button type="button" onClick={() => setOpenLawyerField(null)} className="text-[10px] font-black uppercase text-[#15447c]">Fermer</button>
+            </div>
+            {avocats.map(avocat => (
+              <label key={avocat.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={selected.includes(avocat.fullName)}
+                  onChange={() => toggleLawyer(field, avocat.fullName)}
+                  className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>{avocat.fullName}</span>
+              </label>
+            ))}
+            {avocats.length === 0 && <p className="text-xs text-slate-400 italic">Aucun avocat enregistré.</p>}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const handleFieldChange = (field: string, value: any) => {
     setFormData((prev: any) => {
@@ -121,8 +181,17 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
     }
   };
 
+  const handleDownloadPdf = () => {
+    try {
+      exportFicheToPdf(type, formData);
+    } catch (err) {
+      console.error("PDF generation error:", err);
+      alert("Erreur lors de la génération du PDF.");
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div data-pdf-ignore className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-150 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         
         {/* Header */}
@@ -142,14 +211,27 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
             </h3>
             <p className="text-[10px] text-gray-400 font-bold mt-0.5 font-mono">ID: {formData.id}</p>
           </div>
-          <button 
-            onClick={onClose} 
-            className="text-gray-400 hover:text-gray-655 transition p-1 hover:bg-slate-100 rounded-lg"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-blue-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title="Télécharger la fiche en PDF"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Télécharger PDF</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-655 transition p-1 hover:bg-slate-100 rounded-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -741,16 +823,8 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
                     className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15"
                   />
                 </div>
-                <div>
-                  <label className="block text-[10px] font-extrabold uppercase tracking-wide text-gray-500 mb-1">Avocat(s) Titulaire(s)</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: Me Jérémie Shusu, Me Alain..."
-                    value={formData.avocatTitulaire || ''} 
-                    onChange={(e) => handleFieldChange('avocatTitulaire', e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15"
-                  />
-                </div>
+                {renderLawyerSelector('avocatTitulaire', 'Avocat(s) Titulaire(s)', 'Choisir les titulaires...')}
+                {renderLawyerSelector('avocatsSurDossier', 'Avocat(s) Associé(s) / Rattaché(s)', 'Choisir les avocats associés...')}
                 <div className="md:col-span-2 p-3.5 bg-amber-50/70 border border-amber-250 rounded-xl">
                   <label className="flex items-start gap-2.5 cursor-pointer">
                     <input
@@ -1010,6 +1084,73 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
                               className="w-full p-2 border border-gray-200 rounded-lg text-xs"
                             />
                           </div>
+                        </div>
+
+                        {/* Procedure Attachments Section */}
+                        <div className="mt-3 pt-3 border-t border-slate-150">
+                          <div className="flex justify-between items-center mb-1.5">
+                            <span className="text-[10px] font-extrabold text-indigo-900 uppercase">📎 Pièces jointes de la procédure ({proc.piecesJointes?.length || 0})</span>
+                            <label className="cursor-pointer bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2.5 py-1 rounded-lg transition">
+                              + Ajouter
+                              <input
+                                type="file"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files.length > 0) {
+                                    Array.from(e.target.files).forEach((file: any) => {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        const base64 = reader.result as string;
+                                        const newPj = {
+                                          name: file.name,
+                                          size: (file.size / 1024).toFixed(1) + ' KB',
+                                          content: base64
+                                        };
+                                        const updatedProcs = [...formData.procedures];
+                                        const existing = updatedProcs[index].piecesJointes || [];
+                                        updatedProcs[index].piecesJointes = [...existing, newPj];
+                                        setFormData((prev: any) => ({ ...prev, procedures: updatedProcs }));
+                                      };
+                                      reader.readAsDataURL(file);
+                                    });
+                                  }
+                                  e.target.value = '';
+                                }}
+                              />
+                            </label>
+                          </div>
+                          {proc.piecesJointes && proc.piecesJointes.length > 0 ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                              {proc.piecesJointes.map((pFile: any, pfIdx: number) => (
+                                <div key={pfIdx} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                                  <div className="truncate flex items-center gap-1.5">
+                                    <span>📄</span>
+                                    <span className="font-bold text-slate-800 truncate" title={pFile.name}>{pFile.name}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {pFile.content && (
+                                      <a href={pFile.content} download={pFile.name} className="text-indigo-600 font-bold text-[10px] hover:underline px-1 py-0.5 bg-indigo-50 rounded">Télécharger</a>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const updatedProcs = [...formData.procedures];
+                                        updatedProcs[index].piecesJointes = updatedProcs[index].piecesJointes.filter((_: any, i: number) => i !== pfIdx);
+                                        setFormData((prev: any) => ({ ...prev, procedures: updatedProcs }));
+                                      }}
+                                      className="text-red-500 hover:text-red-700 font-bold text-xs p-1"
+                                      title="Supprimer"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-gray-400 italic">Aucune pièce jointe pour cette procédure.</p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1663,13 +1804,13 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
                         <p className="text-[9px] font-bold text-slate-400 mt-0.5 font-mono">{file.size}</p>
                       </div>
                     </div>
-                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <div className="flex gap-1.5">
                       {file.content && (
                         <a 
                           href={file.content} 
                           download={file.name}
                           className="w-7 h-7 bg-indigo-50 border border-indigo-150 text-indigo-750 hover:bg-indigo-600 hover:text-white rounded-lg flex items-center justify-center text-xs transition shadow-2xs"
-                          title="Télécharger"
+                          title={`Télécharger : ${file.name}`}
                         >
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

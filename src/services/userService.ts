@@ -246,14 +246,7 @@ export async function createNewUser(payload: CreateUserPayload): Promise<AppUser
   const hasAppAccess = payload.hasAppAccess !== undefined ? payload.hasAppAccess : !isOfficePersonnel;
   const rawPassword = (payload.password || payload.tempPassword || 'Cabinet2025!').trim();
   
-  let role: UserRole = 'Personnel';
-  if ((payload as any).role === 'Admin') {
-    role = 'Admin';
-  } else if (payload.userType === 'Avocat') {
-    role = 'Avocat';
-  } else if (payload.userType === 'Personnel') {
-    role = 'Personnel';
-  }
+  let role: UserRole = (payload as any).role || (payload.userType === 'Avocat' ? 'Avocat' : 'Personnel');
 
   const newUser: AppUser = {
     id: newId,
@@ -265,7 +258,7 @@ export async function createNewUser(payload: CreateUserPayload): Promise<AppUser
     functionRole: payload.functionRole || '',
     hasAppAccess: hasAppAccess,
     permissions: hasAppAccess ? (payload.permissions || []) : [],
-    canDelete: role === 'Admin' || (Array.isArray(payload.permissions) && payload.permissions.includes('can_delete')),
+    canDelete: (role as string) === 'Admin' || (Array.isArray(payload.permissions) && payload.permissions.includes('can_delete')),
     status: 'Actif',
     isDeleted: false,
     password: rawPassword,

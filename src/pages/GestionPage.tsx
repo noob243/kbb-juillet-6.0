@@ -1,6 +1,5 @@
-import React, { FC, useRef, useState, useEffect } from 'react';
+import React, { FC, useState, useEffect, useRef } from 'react';
 import PageContainer from '../components/PageContainer';
-import { exportElementToPdf } from '../utils/pdfExport';
 import { UserIcon } from '../components/Icons';
 import { Client, Case, Event, Task, Invoice, Avocat, Personnel, Fournisseur, Correspondance, CaseProcedure } from '../types';
 import { DetailedEditModal } from '../components/DetailedEditModal';
@@ -15,6 +14,7 @@ import { syncUsersWithFirestore } from '../services/userService';
 import { canDeleteRecord, isCaseContentMasked, canViewRestrictedCaseContent, canManageCaseConfidentiality } from '../services/rbacService';
 import { Download, Lock, Unlock } from 'lucide-react';
 import { TaskPriorityBadge } from '../components/common/TaskPriorityBadge';
+import { exportListToPdf, exportElementToPdf } from '../utils/pdfExport';
 
 interface GestionPageProps {
     clients: Client[];
@@ -49,7 +49,6 @@ interface GestionPageProps {
 }
 
 const GestionPage: FC<GestionPageProps> = (props) => {
-    const gestionContentRef = useRef<HTMLDivElement>(null);
     const userCanDelete = canDeleteRecord(props.currentUser ?? null);
     const tableHeaderClass = "p-3 font-extrabold text-2xs text-[#15447c] uppercase tracking-wider bg-slate-50 border-b border-gray-250";
     const tableCellClass = "p-3 text-xs text-gray-700 align-middle border-b border-gray-100";
@@ -207,6 +206,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     // Detailed edit states
     const [detailedEditingType, setDetailedEditingType] = useState<'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'invoice' | 'fournisseur' | 'correspondance' | 'procedure' | null>(null);
     const [detailedEditForm, setDetailedEditForm] = useState<any>(null);
+    const gestionContentRef = useRef<HTMLDivElement>(null);
 
     const startDetailedEdit = (type: 'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'invoice' | 'fournisseur' | 'correspondance' | 'procedure', item: any) => {
         setDetailedEditingType(type);
@@ -334,6 +334,31 @@ const GestionPage: FC<GestionPageProps> = (props) => {
         return String(text).toLowerCase().includes(searchTerm.toLowerCase());
     };
 
+    const downloadAttachment = async (file: { name?: string; content?: string }) => {
+        if (!file.content) return;
+        try {
+            const source = /^(data:|blob:|https?:\/\/)/i.test(file.content)
+                ? file.content
+                : `data:application/octet-stream;base64,${file.content}`;
+            const response = await fetch(source);
+            const blobUrl = URL.createObjectURL(await response.blob());
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = file.name || 'piece-jointe';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        } catch (error) {
+            const link = document.createElement('a');
+            link.href = file.content;
+            link.download = file.name || 'piece-jointe';
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.click();
+        }
+    };
+
     // Filter Avocats
     const filteredAvocats = props.avocats.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'avocat') return false;
@@ -439,7 +464,8 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </button>
             )}
         >
-            <div ref={gestionContentRef} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl max-w-5xl">
+            <div ref={gestionContentRef}>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl max-w-5xl">
                 <div>
                     <p className="text-xs text-slate-600 dark:text-slate-300 font-bold leading-relaxed">
                         🛡️ <span className="text-[#15447c] dark:text-indigo-400 font-black">Console Administrateur KBB RBAC</span>. Gérez les rôles, catégories (Administratif vs Office), autorisations granulaires et archivage logique.
@@ -622,18 +648,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                     return (
                         <div className="flex flex-wrap gap-1 max-w-[150px]">
                             {files.map((file: any, idx: number) => (
-                                <a 
-                                    key={idx} 
-                                    href={file.content || '#'} 
-                                    download={file.name}
-                                    className="inline-flex items-center text-[9px] font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-100 px-1.5 py-0.5 rounded transition" 
-                                    title={`Télécharger : ${file.name} (${file.size || 'N/A'})`}
-                                    onClick={(e) => {
-                                        if (!file.content) e.preventDefault();
-                                    }}
+                                <button
+                                    key={idx}
+                                    type="button"
+                                    disabled={!file.content}
+                                    onClick={() => void downloadAttachment(file)}
+                                    className="inline-flex items-center gap-1 text-[9px] font-bold text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100 border border-indigo-100 disabled:opacity-50 px-1.5 py-0.5 rounded transition"
+                                    title={file.content ? `Télécharger : ${file.name} (${file.size || 'N/A'})` : `Contenu indisponible : ${file.name}`}
                                 >
-                                    �� <span className="truncate max-w-[65px]">{file.name}</span>
-                                </a>
+                                    <Download className="w-3 h-3 shrink-0" />
+                                    <span className="truncate max-w-[65px]">{file.name}</span>
+                                </button>
                             ))}
                         </div>
                     );
@@ -649,6 +674,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Avocats inscrits ({filteredAvocats.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Membres du barreau rattachés au cabinet</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Nom Complet', 'Niveau / Statut', 'Service', 'Rôle Cabinet', 'Téléphone', 'Pièces Jointes'];
+                                const rows = filteredAvocats.map(a => [a.fullName, a.cabinetStatus, a.serviceStatus, a.cabinetRole || 'N/A', a.phone || 'N/A', (a.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Répertoire des Avocats Inscrits", cols, rows, "liste_avocats");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger la liste complète des avocats au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -798,6 +834,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Clients enregistrés ({filteredClients.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Personnes physiques ou de droit moral</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Nom / Raison Sociale', 'Dénomination', 'Contact', 'E-mail', 'Téléphone', 'Facturation', 'Siège Social', 'Pièces Jointes'];
+                                const rows = filteredClients.map(c => [c.name, c.denomination || 'N/A', c.contact, c.email || 'N/A', c.phone || 'N/A', c.typeFacturation || 'Forfaitaire', c.siege || 'N/A', (c.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Répertoire des Clients Enregistrés", cols, rows, "liste_clients");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger la liste complète des clients au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -963,6 +1010,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Dossiers actifs ({filteredCases.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Affaires judiciaires en cours de traitement</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Réf ID', 'Intitulé Dossier', 'Client Titulaire', 'Statut', 'Avocat Titulaire', 'Adversaire', 'Pièces Jointes'];
+                                const rows = filteredCases.map(c => [c.id, c.name, c.client, c.status, c.avocatTitulaire || 'Non attribué', c.adversaire || 'N/A', (c.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Inventaire des Dossiers Actifs", cols, rows, "liste_dossiers");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger l'inventaire complet des dossiers au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -1182,6 +1240,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Membres du personnel ({filteredPersonnels.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Parcours d'embauche, salaires et états de service</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Nom Complet', 'Rôle / Poste', 'Catégorie', 'E-mail', 'Téléphone', 'Statut de Service', 'Pièces Jointes'];
+                                const rows = filteredPersonnels.map(p => [p.fullName, p.role, p.category || 'Administratif', p.email || 'N/A', p.phone || 'N/A', p.serviceStatus, (p.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Registre du Personnel", cols, rows, "liste_personnel");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger le registre du personnel au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -1400,6 +1469,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Événements & Activités ({filteredEvents.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Colloques, séminaires, budgets et états</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Intitulé', 'Type', 'Date', 'Lieu', 'Partenaires', 'Pièces Jointes'];
+                                const rows = filteredEvents.map(e => [e.name, e.type, e.date, e.lieu, e.partenaires || 'N/A', (e.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Planning des Événements & Activités", cols, rows, "liste_evenements");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger la liste des événements au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -1528,6 +1608,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Tâches assignées ({filteredTasks.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Suivi des tâches, avocats responsables et statuts</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['ID', 'Intitulé Tâche', 'Dossier Réf', 'Avocat Responsable', 'Échéance', 'Statut', 'Pièces Jointes'];
+                                const rows = filteredTasks.map(t => [t.id, t.name, t.caseId || 'N/A', t.lawyer, t.dueDate, t.status, (t.attachments || []).length + ' fichier(s)']);
+                                exportListToPdf("Suivi des Tâches & Directives", cols, rows, "liste_taches");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger le suivi des tâches au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -1681,6 +1772,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Factures & Honoraires ({filteredInvoices.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Suivi de facturation client, paiements et restes à payer</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Facture N°', 'Dossier Réf', 'Date Échéance', 'Montant Total', 'Montant Réglé', 'Statut', 'Pièces Jointes'];
+                                const rows = filteredInvoices.map(i => [i.id, i.caseId, i.dueDate, (i.totalAmount || 0) + ' $', (i.paidAmount || 0) + ' $', i.status, (i.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Journal des Factures & Trésorerie", cols, rows, "liste_factures");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger le journal des factures au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -1824,6 +1926,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Fournisseurs & Partenaires tiers ({filteredFournisseurs.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Prestations externes, loyers et contrats de maintenance</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Fournisseur', 'Nature Prestation', 'Désignation', 'Facturation', 'Montant', 'E-mail', 'Pièces Jointes'];
+                                const rows = filteredFournisseurs.map(f => [f.nomComplet, f.naturePrestation, f.designationPrestation, f.typeFacturation, (f.montant || 0) + ' $', f.adresseMail, (f.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Répertoire des Fournisseurs & Prestataires", cols, rows, "liste_fournisseurs");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger le répertoire des fournisseurs au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -1972,6 +2085,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Correspondances & Courriers ({filteredCorrespondances.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Lettres officielles et documents rédigés ou archivés</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Réf ID', 'Nature / Type', 'Objet / Sujet', 'Expéditeur / Destinataire', 'Date', 'Statut', 'Pièces Jointes'];
+                                const rows = filteredCorrespondances.map(c => [c.id, `${c.nature || 'Émise'} (${c.type || 'Lettre'})`, c.subject, c.recipientName || c.destinataire || 'N/A', c.date, c.status, (c.piecesJointes || []).length + ' fichier(s)']);
+                                exportListToPdf("Registre des Correspondances & Courriers", cols, rows, "liste_correspondances");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger le registre des correspondances au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -2098,6 +2222,17 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <h3 className="text-sm font-black text-gray-800 tracking-tight">Procédures en cours ({filteredProcedures.length})</h3>
                             <p className="text-[10px] text-gray-400 font-bold mt-0.5">Suivi des actions en justice et instances d'arbitrage ou de conciliation</p>
                         </div>
+                        <button
+                            onClick={() => {
+                                const cols = ['Réf ID', 'Intitulé Procédure', 'Instance / Juridiction', 'Dossier Lié', 'Statut'];
+                                const rows = filteredProcedures.map(p => [p.id, p.name, p.instance || 'N/A', p.caseName, p.status || 'En cours']);
+                                exportListToPdf("Registre des Procédures Judiciaires", cols, rows, "liste_procedures");
+                            }}
+                            className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                            title="Télécharger la liste des procédures au format PDF"
+                        >
+                            <span>📄 Exporter PDF (Liste)</span>
+                        </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[650px]">
@@ -2225,6 +2360,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
             )}
             </>
             )}
+            </div>
 
             {/* MODAL DE MODIFICATION DÉTAILLÉE (MODULAIRE ET PROPRE) */}
             {detailedEditingType && detailedEditForm && (
@@ -2232,6 +2368,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                     type={detailedEditingType}
                     item={detailedEditForm}
                     clients={props.clients}
+                    avocats={props.avocats}
                     onClose={closeDetailedEdit}
                     onSave={(updatedItem) => {
                         if (detailedEditingType === 'client') {

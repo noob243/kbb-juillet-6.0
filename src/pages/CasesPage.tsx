@@ -1,12 +1,14 @@
 
-import React, { FC, useState } from 'react';
+import React, { FC, useRef, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import CaseModal from '../components/modals/CaseModal';
 import InvoiceDetailModal from '../components/modals/InvoiceDetailModal';
 import { Case, Client, Avocat, Task, Invoice, Correspondance } from '../types';
 import { AppUser } from '../types/rbac';
-import { Eye, Mail, Lock, Unlock, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Download, Eye, Mail, Lock, Unlock, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { isCaseContentMasked, canManageCaseConfidentiality, canViewRestrictedCaseContent } from '../services/rbacService';
+import { DetailedEditModal } from '../components/DetailedEditModal';
+import { exportElementToPdf } from '../utils/pdfExport';
 
 interface CasesPageProps {
   cases: Case[];
@@ -58,11 +60,40 @@ const CasesPage: FC<CasesPageProps> = ({
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+    const [editingCase, setEditingCase] = useState<Case | null>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [displayLimit, setDisplayLimit] = useState<number>(40);
     const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+    const selectedCaseContentRef = useRef<HTMLDivElement>(null);
 
     const activeUser = currentUser || currentUserInfo;
+
+    const downloadAttachment = async (file: { name?: string; content?: string }) => {
+        if (!file.content) return;
+        try {
+            const source = /^(data:|blob:|https?:\/\/)/i.test(file.content)
+                ? file.content
+                : `data:application/octet-stream;base64,${file.content}`;
+            const response = await fetch(source);
+            const blobUrl = URL.createObjectURL(await response.blob());
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = file.name || 'piece-jointe';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        } catch {
+            const link = document.createElement('a');
+            link.href = file.content;
+            link.download = file.name || 'piece-jointe';
+            link.target = '_blank';
+            link.rel = 'noopener';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+    };
 
     const handleToggleConfidentiality = (c: Case) => {
         if (!canManageCaseConfidentiality(activeUser, c)) {
@@ -322,7 +353,7 @@ const CasesPage: FC<CasesPageProps> = ({
                 
                 return (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[60] flex justify-center items-center p-4">
-                        <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn">
+                        <div ref={selectedCaseContentRef} className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn">
                             {/* Header */}
                             <div className="flex justify-between items-start mb-4 border-b border-gray-100 pb-4">
                                 <div className="flex-1 pr-4">
@@ -444,14 +475,27 @@ const CasesPage: FC<CasesPageProps> = ({
                                         </div>
                                     )}
                                 </div>
-                                <button 
-                                    onClick={() => setSelectedCase(null)} 
-                                    className="p-1.5 hover:bg-slate-100 rounded-xl text-gray-400 hover:text-gray-650 transition"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        type="button"
+                                        data-pdf-ignore
+                                        onClick={() => selectedCaseContentRef.current && void exportElementToPdf(selectedCaseContentRef.current, `dossier_${selectedCase.id}`, selectedCaseContentRef.current.clientWidth)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#15447c] hover:bg-blue-900 text-white text-xs font-bold rounded-lg transition"
+                                        title="Exporter cette fiche dossier en PDF"
+                                    >
+                                        <Download className="w-4 h-4" /> PDF
+                                    </button>
+                                    <button
+                                        data-pdf-ignore
+                                        onClick={() => setSelectedCase(null)}
+                                        className="p-1.5 hover:bg-slate-100 rounded-xl text-gray-400 hover:text-gray-650 transition"
+                                        title="Fermer"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Sensitivity notice banner */}
@@ -663,9 +707,19 @@ const CasesPage: FC<CasesPageProps> = ({
                                                 <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block mb-1.5">Pièces jointes ({selectedCase.piecesJointes.length})</span>
                                                 <div className="flex flex-wrap gap-2">
                                                     {selectedCase.piecesJointes.map((pj, idx) => (
-                                                        <span key={idx} className="inline-flex items-center gap-1 text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg font-bold text-slate-700 shadow-3xs">
-                                                            📎 {pj.name} <span className="text-[10px] text-slate-400 font-normal">({pj.size})</span>
-                                                        </span>
+                                                        <div key={idx} className="inline-flex items-center gap-2 text-xs bg-white border border-slate-200 px-2.5 py-1 rounded-lg font-bold text-slate-700 shadow-3xs">
+                                                            <span>📎 {pj.name} <span className="text-[10px] text-slate-400 font-normal">({pj.size})</span></span>
+                                                            <button
+                                                                type="button"
+                                                                data-pdf-ignore
+                                                                disabled={!pj.content}
+                                                                onClick={() => void downloadAttachment(pj)}
+                                                                className="inline-flex items-center gap-1 text-indigo-700 hover:text-indigo-900 disabled:text-slate-300 text-[10px] font-extrabold"
+                                                                title={pj.content ? `Télécharger ${pj.name}` : 'Contenu du fichier indisponible'}
+                                                            >
+                                                                <Download className="w-3.5 h-3.5" /> Télécharger
+                                                            </button>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
@@ -736,17 +790,46 @@ const CasesPage: FC<CasesPageProps> = ({
                                 <div className="text-2xs text-gray-400">
                                     Propriété exclusive de KBB Law Firm scp
                                 </div>
-                                <button 
-                                    onClick={() => setSelectedCase(null)} 
-                                    className="bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold py-2 px-6 rounded-xl transition duration-150 text-sm"
-                                >
-                                    Fermer le dossier
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {onUpdateCase && (
+                                        <button
+                                            data-pdf-ignore
+                                            onClick={() => {
+                                                setEditingCase(selectedCase);
+                                                setSelectedCase(null);
+                                            }}
+                                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold py-2 px-4 rounded-xl transition duration-150 text-sm"
+                                        >
+                                            Modifier le dossier
+                                        </button>
+                                    )}
+                                    <button
+                                        data-pdf-ignore
+                                        onClick={() => setSelectedCase(null)}
+                                        className="bg-slate-100 hover:bg-slate-200 text-gray-800 font-bold py-2 px-6 rounded-xl transition duration-150 text-sm"
+                                    >
+                                        Fermer le dossier
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 );
             })()}
+
+            {editingCase && (
+                <DetailedEditModal
+                    type="case"
+                    item={editingCase}
+                    clients={safeClients}
+                    avocats={safeAvocats}
+                    onClose={() => setEditingCase(null)}
+                    onSave={(updatedCase) => {
+                        onUpdateCase?.(updatedCase as Case);
+                        setEditingCase(null);
+                    }}
+                />
+            )}
 
             <InvoiceDetailModal 
                 isOpen={!!selectedInvoice}
