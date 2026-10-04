@@ -22,6 +22,38 @@ export function formatFieldValue(val: any): string {
   return String(val);
 }
 
+let pdfExportSequence = 0;
+
+function createPdfCaptureId(element: HTMLElement): string {
+  const captureId = `kbb-pdf-capture-${Date.now()}-${++pdfExportSequence}`;
+  element.id = captureId;
+  return captureId;
+}
+
+function createHtml2CanvasOptions(captureId: string, scale: number, windowWidth?: number) {
+  return {
+    scale,
+    useCORS: true,
+    logging: false,
+    ...(windowWidth ? { windowWidth } : {}),
+    onclone: (clonedDocument: Document) => {
+      const captureElement = clonedDocument.getElementById(captureId);
+      if (captureElement) {
+        Object.assign(captureElement.style, {
+          position: 'static',
+          left: 'auto',
+          top: 'auto',
+          right: 'auto',
+          zIndex: 'auto',
+          visibility: 'visible',
+          opacity: '1',
+          clipPath: 'none'
+        });
+      }
+    }
+  };
+}
+
 /**
  * Export a single record / fiche to PDF preserving GUI layout styling
  */
@@ -62,14 +94,18 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
 
   // Construct styled HTML container
   const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '-9999px';
+  container.style.position = 'relative';
+  container.style.left = 'auto';
+  container.style.top = 'auto';
+  container.style.clipPath = 'inset(100%)';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = 'auto';
   container.style.width = '800px';
   container.style.padding = '32px';
   container.style.backgroundColor = '#ffffff';
   container.style.fontFamily = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
   container.style.color = '#1e293b';
+  const captureId = createPdfCaptureId(container);
 
   container.innerHTML = `
     <div style="border: 2px solid #15447c; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
@@ -215,7 +251,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
         margin: 8,
         filename: `fiche_${type}_${recordId}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: createHtml2CanvasOptions(captureId, 2),
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
       await html2pdf().from(container).set(opt).save();
@@ -252,14 +288,18 @@ export async function exportListToPdf(
   });
 
   const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.left = '-9999px';
-  container.style.top = '-9999px';
+  container.style.position = 'relative';
+  container.style.left = 'auto';
+  container.style.top = 'auto';
+  container.style.clipPath = 'inset(100%)';
+  container.style.pointerEvents = 'none';
+  container.style.zIndex = 'auto';
   container.style.width = '1000px';
   container.style.padding = '32px';
   container.style.backgroundColor = '#ffffff';
   container.style.fontFamily = "'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
   container.style.color = '#1e293b';
+  const captureId = createPdfCaptureId(container);
 
   container.innerHTML = `
     <div style="border: 2px solid #15447c; border-radius: 16px; padding: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
@@ -324,7 +364,7 @@ export async function exportListToPdf(
         margin: 8,
         filename: `${filenamePrefix}_${Date.now()}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: createHtml2CanvasOptions(captureId, 2),
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       };
       await html2pdf().from(container).set(opt).save();
@@ -349,6 +389,7 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
   }
 
   const clone = element.cloneNode(true) as HTMLElement;
+  const captureId = createPdfCaptureId(clone);
   clone.querySelectorAll('[data-pdf-ignore]').forEach(node => node.remove());
   clone.querySelectorAll('table').forEach(table => {
     const headerCells = table.querySelectorAll('thead th');
@@ -362,9 +403,12 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
     node.style.overflowY = 'visible';
   });
   Object.assign(clone.style, {
-    position: 'absolute',
-    left: '-10000px',
-    top: '0',
+    position: 'relative',
+    left: 'auto',
+    top: 'auto',
+    clipPath: 'inset(100%)',
+    pointerEvents: 'none',
+    zIndex: 'auto',
     width: `${captureWidth}px`,
     maxWidth: 'none',
     maxHeight: 'none',
@@ -379,7 +423,7 @@ export async function exportElementToPdf(element: HTMLElement, filenamePrefix: s
       margin: 8,
       filename: `${filenamePrefix}_${Date.now()}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 1200 },
+      html2canvas: createHtml2CanvasOptions(captureId, 1.5, 1200),
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
       pagebreak: { mode: ['css', 'legacy'] }
     }).save();
