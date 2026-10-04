@@ -1719,7 +1719,7 @@ function App() {
         };
 
         switch (currentPage) {
-            case 'Dashboard': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="dashboard"><DashboardPage clients={filteredClients} cases={filteredCases} events={filteredEvents} tasks={tasks} invoices={invoices} avocats={avocats} onUpdateTaskStatus={handleUpdateTaskStatus} onAddTask={handleAddTask} onNavigate={(page, query) => { setCurrentPage(page); if (query) setSearchQuery(query); }} /></ProtectedGuard>;
+            case 'Dashboard': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="dashboard"><DashboardPage clients={filteredClients} cases={filteredCases} events={filteredEvents} tasks={tasks} invoices={invoices} avocats={avocats} currentUser={currentUserObj} currentUserInfo={currentUserInfo} onUpdateTaskStatus={handleUpdateTaskStatus} onAddTask={handleAddTask} onNavigate={(page, query) => { setCurrentPage(page); if (query) setSearchQuery(query); }} /></ProtectedGuard>;
             case 'AIAssistant': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="ai"><AIAssistantPage clients={filteredClients} cases={filteredCases} tasks={tasks} invoices={invoices} currentUser={currentUserObj} currentUserInfo={currentUserInfo} /></ProtectedGuard>;
             case 'Clients': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="clients"><ClientsPage clients={filteredClients} cases={cases} invoices={invoices} tasks={tasks} onAddClient={handleAddClient} onExport={handleExportClients} onSendEmail={triggerEmail} /></ProtectedGuard>;
             case 'Dossiers': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="cases"><CasesPage cases={filteredCases} clients={filteredClients} tasks={tasks} invoices={invoices} onAddCase={handleAddCase} onExport={handleExportCases} avocats={avocats} onSendEmail={triggerEmail} onNavigate={(page, query) => { setCurrentPage(page); if (query) setSearchQuery(query); }} /></ProtectedGuard>;
@@ -1770,8 +1770,8 @@ function App() {
             case 'Guide':
             case 'Documentation':
                 return <PresentationPage onAddToast={triggerToast} />;
-            case 'All': return <AllInterfacesPage {...pageProps} />;
-            default: return <DashboardPage clients={filteredClients} cases={filteredCases} events={filteredEvents} tasks={tasks} invoices={invoices} avocats={avocats} personnels={personnels} onUpdateTaskStatus={handleUpdateTaskStatus} onAddTask={handleAddTask} onNavigate={(page, query) => { setCurrentPage(page); if (query) setSearchQuery(query); }} />;
+            case 'All': return <AllInterfacesPage {...pageProps} currentUser={currentUserObj} currentUserInfo={currentUserInfo} />;
+            default: return <DashboardPage clients={filteredClients} cases={filteredCases} events={filteredEvents} tasks={tasks} invoices={invoices} avocats={avocats} personnels={personnels} currentUser={currentUserObj} currentUserInfo={currentUserInfo} onUpdateTaskStatus={handleUpdateTaskStatus} onAddTask={handleAddTask} onNavigate={(page, query) => { setCurrentPage(page); if (query) setSearchQuery(query); }} />;
         }
     };
 

@@ -9,6 +9,7 @@ import ChatPage from './ChatPage';
 import BillingPage from './BillingPage';
 import AvocatsPage from './AvocatsPage';
 import { Client, Case, Event, Task, Invoice, Avocat, Personnel, Fournisseur } from '../types';
+import { AppUser } from '../types/rbac';
 
 interface AllInterfacesPageProps {
     clients: Client[];
@@ -20,6 +21,8 @@ interface AllInterfacesPageProps {
     personnels: Personnel[];
     fournisseurs: Fournisseur[];
     lawyerNames: string[];
+    currentUser?: AppUser | null;
+    currentUserInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null;
     onAddClient: (client: Omit<Client, 'id'>) => void;
     onAddCase: (dossier: Case) => void;
     onAddEvent: (event: Event) => void;
@@ -36,7 +39,7 @@ const AllInterfacesPage: FC<AllInterfacesPageProps> = (props) => {
         <div className="space-y-12">
             <div>
                 <h2 className="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-indigo-500">Tableau de Bord</h2>
-                <DashboardPage clients={props.clients} cases={props.cases} events={props.events} tasks={props.tasks} />
+                <DashboardPage clients={props.clients} cases={props.cases} events={props.events} tasks={props.tasks} currentUser={props.currentUser} currentUserInfo={props.currentUserInfo} />
             </div>
              <div>
                 <h2 className="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-indigo-500">Clients</h2>

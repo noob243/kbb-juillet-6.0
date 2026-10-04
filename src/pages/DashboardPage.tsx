@@ -762,7 +762,7 @@ const DashboardPage: FC<DashboardPageProps> = ({ clients = [], cases = [], event
                     </div>
                 </div>
 
-                {/* Financial Summary Card (Tabbed) */}
+                {canSeeFinancials && (
                 <div className="bg-white p-6 rounded-2xl shadow-xs border border-gray-150 flex flex-col justify-between">
                     <div>
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
@@ -895,6 +895,7 @@ const DashboardPage: FC<DashboardPageProps> = ({ clients = [], cases = [], event
                         </div>
                     </div>
                 </div>
+                )}
 
             </div>
 
