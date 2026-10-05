@@ -238,58 +238,6 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
                         </div>
                     </form>
 
-                    {/* Quick Access Admin Accounts */}
-                    <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800/80">
-                        <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3 text-center">
-                            Accès Rapide Administrateurs
-                        </p>
-                        <div className="space-y-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setEmail('jeremieshusu4@gmail.com');
-                                    setPassword('123456789');
-                                }}
-                                className="w-full text-left p-2.5 rounded-xl border border-indigo-100 dark:border-indigo-950/40 bg-indigo-50/50 dark:bg-indigo-950/20 hover:bg-indigo-100/60 dark:hover:bg-indigo-900/30 transition flex items-center justify-between group"
-                            >
-                                <div>
-                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Jérémie Shusu</p>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">jeremieshusu4@gmail.com</p>
-                                </div>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white">Admin Principal</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setEmail('hervemich@icloud.com');
-                                    setPassword('123456789');
-                                }}
-                                className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition flex items-center justify-between group"
-                            >
-                                <div>
-                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Hervé Mich</p>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">hervemich@icloud.com</p>
-                                </div>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">Admin Associé</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setEmail('admin@cabinet.com');
-                                    setPassword('123456789');
-                                }}
-                                className="w-full text-left p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition flex items-center justify-between group"
-                            >
-                                <div>
-                                    <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">Administrateur Cabinet</p>
-                                    <p className="text-[11px] text-slate-500 dark:text-slate-400">admin@cabinet.com</p>
-                                </div>
-                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">Admin</span>
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
