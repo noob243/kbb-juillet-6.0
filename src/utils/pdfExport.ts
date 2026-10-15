@@ -228,9 +228,6 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
           <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
             CABINET D’AVOCATS KBB LAW FIRM scp
           </div>
-          <div style="font-size: 11px; font-weight: 700; color: #d97706; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px;">
-            Plateforme Métier & Traçabilité Juridique
-          </div>
           <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
             Réf. <strong>${escapeHtml(recordId)}</strong> · Exporté le ${escapeHtml(exportDate)}
           </div>
