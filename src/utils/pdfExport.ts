@@ -255,7 +255,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
             ${escapeHtml(item.fullName || item.name || item.nomComplet || item.subject || 'Fiche Enregistrement')}
           </h2>
           <p style="font-size: 12px; font-weight: 600; color: #475569; margin: 4px 0 0 0;">
-            ${escapeHtml(item.cabinetStatus || item.role || item.client || item.secteur || item.status || 'Cabinet KBB')}
+            ${escapeHtml(item.cabinetStatus || item.role || item.client || item.secteur || item.status || 'Cabinet KBB LAW FIRM scp')}
           </p>
         </div>
       </div>
@@ -263,7 +263,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
       <!-- Grid of Attributes -->
       <div style="margin-bottom: 20px;">
         <h3 style="font-size: 12px; font-weight: 800; color: #15447c; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 12px;">
-          📋 Informations Détaillées
+          Informations Détaillées
         </h3>
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
           ${fieldEntries.map(([key, val]) => `
@@ -342,8 +342,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
       <!-- Footer Sign-off -->
       <div style="margin-top: 28px; border-top: 1px dashed #cbd5e1; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end;">
         <div style="font-size: 9px; color: #94a3b8; line-height: 1.4;">
-          Document officiel généré automatiquement depuis l'ERP Cabinet KBB SARL.<br/>
-          Toute modification manuelle non authentifiée invalide cette fiche.
+        Document officiel généré depuis l'App du Cabinet KBB LAW FIRM scp.<br/>
         </div>
         <div style="text-align: center; border-top: 1px solid #0f172a; width: 160px; padding-top: 4px; font-size: 10px; font-weight: 800; color: #15447c;">
           Cachet & Signature KBB
