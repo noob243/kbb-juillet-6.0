@@ -14,6 +14,8 @@ import { syncUsersWithFirestore } from '../services/userService';
 import { canDeleteRecord, isCaseContentMasked, canViewRestrictedCaseContent, canManageCaseConfidentiality } from '../services/rbacService';
 import { Download, Lock, Unlock } from 'lucide-react';
 import { TaskPriorityBadge } from '../components/common/TaskPriorityBadge';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 import { exportListToPdf, exportElementToPdf } from '../utils/pdfExport';
 
 interface GestionPageProps {
@@ -428,6 +430,18 @@ const GestionPage: FC<GestionPageProps> = (props) => {
         if (!searchTerm) return true;
         return matchesSearch(item.id) || matchesSearch(item.name) || matchesSearch(item.instance) || matchesSearch(item.objet) || matchesSearch(item.status) || matchesSearch(item.caseId) || matchesSearch(item.caseName);
     });
+
+    const paginationResetKey = `${searchTerm}:${searchCategory}`;
+    const avocatsPagination = usePagination<Avocat>(filteredAvocats, paginationResetKey);
+    const clientsPagination = usePagination<Client>(filteredClients, paginationResetKey);
+    const casesPagination = usePagination<Case>(filteredCases, paginationResetKey);
+    const personnelsPagination = usePagination<Personnel>(filteredPersonnels, paginationResetKey);
+    const eventsPagination = usePagination<Event>(filteredEvents, paginationResetKey);
+    const tasksPagination = usePagination<Task>(filteredTasks, paginationResetKey);
+    const invoicesPagination = usePagination<Invoice>(filteredInvoices, paginationResetKey);
+    const fournisseursPagination = usePagination<Fournisseur>(filteredFournisseurs, paginationResetKey);
+    const correspondancesPagination = usePagination<Correspondance>(filteredCorrespondances, paginationResetKey);
+    const proceduresPagination = usePagination<CaseProcedure & { caseId: string; caseName: string }>(filteredProcedures, paginationResetKey);
     
     // Calculate completed tasks per lawyer for workload visualization
     const lawyerCompletedTaskCounts = props.avocats.map(avocat => {
@@ -700,7 +714,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredAvocats.map((item) => {
+                                {avocatsPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'avocat' && editingId === item.id;
                                     return (
                                         <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -826,6 +840,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'avocat') && (
+                <PaginationControls currentPage={avocatsPagination.currentPage} pageCount={avocatsPagination.pageCount} startIndex={avocatsPagination.startIndex} totalItems={filteredAvocats.length} itemLabel="avocats" onPageChange={avocatsPagination.setCurrentPage} />
+            )}
+
             {/* Section Clients */}
             {(searchCategory === 'all' || searchCategory === 'client') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -861,7 +879,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredClients.map((item) => {
+                                {clientsPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'client' && editingId === item.id;
                                     return (
                                         <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -1002,6 +1020,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'client') && (
+                <PaginationControls currentPage={clientsPagination.currentPage} pageCount={clientsPagination.pageCount} startIndex={clientsPagination.startIndex} totalItems={filteredClients.length} itemLabel="clients" onPageChange={clientsPagination.setCurrentPage} />
+            )}
+
             {/* Section Dossiers */}
             {(searchCategory === 'all' || searchCategory === 'case') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -1036,7 +1058,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredCases.map((item) => {
+                                {casesPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'case' && editingId === item.id;
                                     const isMasked = isCaseContentMasked(item);
                                     const canManageConf = canManageCaseConfidentiality(props.currentUser ?? null, item);
@@ -1232,6 +1254,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'case') && (
+                <PaginationControls currentPage={casesPagination.currentPage} pageCount={casesPagination.pageCount} startIndex={casesPagination.startIndex} totalItems={filteredCases.length} itemLabel="dossiers" onPageChange={casesPagination.setCurrentPage} />
+            )}
+
             {/* Section Personnel */}
             {(searchCategory === 'all' || searchCategory === 'personnel') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -1267,7 +1293,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredPersonnels.map((item) => {
+                                {personnelsPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'personnel' && editingId === item.id;
                                     return (
                                         <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -1461,6 +1487,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'personnel') && (
+                <PaginationControls currentPage={personnelsPagination.currentPage} pageCount={personnelsPagination.pageCount} startIndex={personnelsPagination.startIndex} totalItems={filteredPersonnels.length} itemLabel="personnels" onPageChange={personnelsPagination.setCurrentPage} />
+            )}
+
             {/* Section Événements */}
             {(searchCategory === 'all' || searchCategory === 'event') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -1495,7 +1525,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredEvents.map((item) => {
+                                {eventsPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'event' && editingId === item.id;
                                     return (
                                         <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -1600,6 +1630,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'event') && (
+                <PaginationControls currentPage={eventsPagination.currentPage} pageCount={eventsPagination.pageCount} startIndex={eventsPagination.startIndex} totalItems={filteredEvents.length} itemLabel="événements" onPageChange={eventsPagination.setCurrentPage} />
+            )}
+
             {/* Section Tâches */}
             {(searchCategory === 'all' || searchCategory === 'task') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -1635,7 +1669,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredTasks.map((item) => {
+                                {tasksPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'task' && editingId === item.id;
                                     return (
                                         <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -1764,6 +1798,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'task') && (
+                <PaginationControls currentPage={tasksPagination.currentPage} pageCount={tasksPagination.pageCount} startIndex={tasksPagination.startIndex} totalItems={filteredTasks.length} itemLabel="tâches" onPageChange={tasksPagination.setCurrentPage} />
+            )}
+
             {/* Section Factures */}
             {(searchCategory === 'all' || searchCategory === 'invoice') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -1800,7 +1838,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredInvoices.map((item) => {
+                                {invoicesPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'invoice' && editingId === item.id;
                                     const reste = (item.totalAmount || 0) - (item.paidAmount || 0);
                                     return (
@@ -1918,6 +1956,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'invoice') && (
+                <PaginationControls currentPage={invoicesPagination.currentPage} pageCount={invoicesPagination.pageCount} startIndex={invoicesPagination.startIndex} totalItems={filteredInvoices.length} itemLabel="factures" onPageChange={invoicesPagination.setCurrentPage} />
+            )}
+
             {/* Section Fournisseurs */}
             {(searchCategory === 'all' || searchCategory === 'fournisseur') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -1954,7 +1996,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredFournisseurs.map((item) => {
+                                {fournisseursPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'fournisseur' && editingId === item.id;
                                     return (
                                         <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -2077,6 +2119,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'fournisseur') && (
+                <PaginationControls currentPage={fournisseursPagination.currentPage} pageCount={fournisseursPagination.pageCount} startIndex={fournisseursPagination.startIndex} totalItems={filteredFournisseurs.length} itemLabel="fournisseurs" onPageChange={fournisseursPagination.setCurrentPage} />
+            )}
+
             {/* Section Correspondances */}
             {(searchCategory === 'all' || searchCategory === 'correspondance') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -2112,7 +2158,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredCorrespondances.map((item) => {
+                                {correspondancesPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'correspondance' && editingId === item.id;
                                     return (
                                         <tr key={item.id} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -2214,6 +2260,10 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
+            {(searchCategory === 'all' || searchCategory === 'correspondance') && (
+                <PaginationControls currentPage={correspondancesPagination.currentPage} pageCount={correspondancesPagination.pageCount} startIndex={correspondancesPagination.startIndex} totalItems={filteredCorrespondances.length} itemLabel="correspondances" onPageChange={correspondancesPagination.setCurrentPage} />
+            )}
+
             {/* Section Procédures */}
             {(searchCategory === 'all' || searchCategory === 'procedure') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
@@ -2250,7 +2300,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredProcedures.map((item) => {
+                                {proceduresPagination.visibleItems.map((item) => {
                                     const isEditing = editingType === 'procedure' && editingId === item.id;
                                     return (
                                         <tr key={`${item.caseId}-${item.id}`} className="border-b border-gray-100 hover:bg-slate-50/20 transition">
@@ -2357,6 +2407,9 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                         </table>
                     </div>
                 </div>
+            )}
+            {(searchCategory === 'all' || searchCategory === 'procedure') && (
+                <PaginationControls currentPage={proceduresPagination.currentPage} pageCount={proceduresPagination.pageCount} startIndex={proceduresPagination.startIndex} totalItems={filteredProcedures.length} itemLabel="procédures" onPageChange={proceduresPagination.setCurrentPage} />
             )}
             </>
             )}

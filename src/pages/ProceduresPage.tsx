@@ -21,6 +21,8 @@ import {
   User,
   ArrowRight
 } from 'lucide-react';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface ProceduresPageProps {
   cases: Case[];
@@ -49,7 +51,6 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
   const searchQuery = parentSearchQuery !== undefined ? parentSearchQuery : localSearchQuery;
   const setSearchQuery = parentSetSearchQuery !== undefined ? parentSetSearchQuery : setLocalSearchQuery;
   const [statusFilter, setStatusFilter] = useState('All');
-  const [displayLimit, setDisplayLimit] = useState<number>(40);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -112,6 +113,7 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
     
     return matchesSearch && matchesStatus;
   });
+  const pagination = usePagination(filteredProcedures, `${searchQuery}:${statusFilter}`);
 
   // Stats calculate
   const totalCount = allProcedures.length;
@@ -356,7 +358,7 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
       ) : (
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {filteredProcedures.slice(0, displayLimit).map((proc) => (
+            {pagination.visibleItems.map((proc) => (
               <div 
                 key={proc.id} 
                 className="bg-white dark:bg-[#0e1726] border border-gray-150 dark:border-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700 rounded-2xl p-5 shadow-xs transition duration-300 relative flex flex-col justify-between"
@@ -431,33 +433,14 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
           ))}
           </div>
 
-          {filteredProcedures.length > 40 && (
-            <div className="p-4 bg-white dark:bg-[#0e1726] rounded-2xl border border-gray-150 dark:border-slate-800/60 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-              <span className="text-gray-500 dark:text-slate-400 font-medium">
-                Affichage de <strong className="text-gray-800 dark:text-slate-200">{Math.min(displayLimit, filteredProcedures.length)}</strong> sur <strong className="text-gray-800 dark:text-slate-200">{filteredProcedures.length}</strong> procédures
-              </span>
-              
-              <div className="flex items-center gap-2">
-                {filteredProcedures.length > displayLimit && (
-                  <button
-                    onClick={() => setDisplayLimit(prev => prev + 40)}
-                    className="px-4 py-2 bg-[#15447c] hover:bg-[#15447c]/90 text-white font-bold rounded-xl shadow-xs transition duration-150 cursor-pointer"
-                  >
-                    Voir plus (+40)
-                  </button>
-                )}
-
-                {displayLimit < filteredProcedures.length && (
-                  <button
-                    onClick={() => setDisplayLimit(filteredProcedures.length)}
-                    className="px-3.5 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-gray-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer"
-                  >
-                    Tout afficher
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          <PaginationControls
+            currentPage={pagination.currentPage}
+            pageCount={pagination.pageCount}
+            startIndex={pagination.startIndex}
+            totalItems={filteredProcedures.length}
+            itemLabel="procédures"
+            onPageChange={pagination.setCurrentPage}
+          />
         </div>
       )}
 

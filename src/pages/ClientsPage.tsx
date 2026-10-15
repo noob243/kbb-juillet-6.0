@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { Client, Case, Invoice, Task } from '../types';
 import { isActiveCase, isCaseForClient } from '../utils/caseHelpers';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface ClientsPageProps {
   clients: Client[];
@@ -52,6 +54,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
     const safeCases = Array.isArray(cases) ? cases : [];
     const safeInvoices = Array.isArray(invoices) ? invoices : [];
     const safeTasks = Array.isArray(tasks) ? tasks : [];
+    const pagination = usePagination(safeClients);
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -157,7 +160,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                     </td>
                                 </tr>
                             ) : (
-                                safeClients.map((client, index) => {
+                                pagination.visibleItems.map((client, index) => {
                                     if (!client) return null;
                                     const details = getClientDetails(client);
                                     const activeCaseCount = safeCases.filter(caseRecord =>
@@ -167,7 +170,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                     <tr key={client.id} className="hover:bg-slate-50/50 transition duration-150">
                                         <td className="p-4 pl-6 text-center w-14">
                                             <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black text-xs font-mono">
-                                                {index + 1}
+                                                {pagination.startIndex + index + 1}
                                             </span>
                                         </td>
                                         <td className="p-4">
@@ -224,6 +227,14 @@ const ClientsPage: FC<ClientsPageProps> = ({
                         </tbody>
                     </table>
                 </div>
+                <PaginationControls
+                    currentPage={pagination.currentPage}
+                    pageCount={pagination.pageCount}
+                    startIndex={pagination.startIndex}
+                    totalItems={safeClients.length}
+                    itemLabel="clients"
+                    onPageChange={pagination.setCurrentPage}
+                />
             </PageContainer>
             
             <ClientModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={onAddClient} existingClients={clients} />

@@ -5,6 +5,8 @@ import TaskPriorityBadge from '../components/common/TaskPriorityBadge';
 import { CalendarIcon, CheckSquareIcon, FolderIcon, EditIcon, ChartIcon, BellIcon, MapPinIcon } from '../components/Icons';
 import { Task, Case, Avocat, Event, TaskPriority } from '../types';
 import { playAlarmSound, stopAllAlarmSounds } from '../utils/audio';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface AgendaPageProps {
   tasks: Task[];
@@ -45,7 +47,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     const [selectedTaskForModal, setSelectedTaskForModal] = useState<Task | null>(null);
     const [selectedEventForModal, setSelectedEventForModal] = useState<Event | null>(null);
     const [prefilledStartDate, setPrefilledStartDate] = useState<string | null>(null);
-    const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
+    const [expandedTaskIds, setExpandedTaskIds] = useState<number[]>([]);
 
     const [editReminderEnabled, setEditReminderEnabled] = useState(false);
     const [editReminderDate, setEditReminderDate] = useState('');
@@ -103,7 +105,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
         setSelectedTaskForModal(updatedTask);
     };
 
-    const toggleRow = (taskId: string) => {
+    const toggleRow = (taskId: number) => {
         setExpandedTaskIds(prev => 
             prev.includes(taskId) ? prev.filter(id => id !== taskId) : [...prev, taskId]
         );
@@ -211,6 +213,8 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     const finalEvents = selectedFilterDate
         ? events.filter(event => event.date === selectedFilterDate)
         : events;
+    const taskPagination = usePagination<Task>(finalTasks, `${selectedFilterDate}:${priorityFilter}:${showOnlyOverdue}`);
+    const eventPagination = usePagination<Event>(finalEvents, selectedFilterDate || '');
 
     const handlePrevMonth = () => {
         setCalendarDate(new Date(year, month - 1, 1));
@@ -609,7 +613,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                             </thead>
                             <tbody className="divide-y divide-gray-100 bg-white">
                                 {finalTasks.length > 0 ? (
-                                    finalTasks.map(task => {
+                                    taskPagination.visibleItems.map(task => {
                                         const relatedCase = cases.find(c => c.id === task.caseId);
                                         const late = isOverdue(task);
                                         const isHighlighted = selectedFilterDate && isTaskActiveOnDate(task, selectedFilterDate);
@@ -932,6 +936,14 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                             </tbody>
                         </table>
                     </div>
+                    <PaginationControls
+                        currentPage={taskPagination.currentPage}
+                        pageCount={taskPagination.pageCount}
+                        startIndex={taskPagination.startIndex}
+                        totalItems={finalTasks.length}
+                        itemLabel="tâches"
+                        onPageChange={taskPagination.setCurrentPage}
+                    />
                     {hasMoreTasks && onLoadMoreTasks && (
                         <div className="mt-4 text-center">
                             <button
@@ -968,7 +980,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 bg-white">
                                     {finalEvents.length > 0 ? (
-                                        finalEvents.map(ev => (
+                                        eventPagination.visibleItems.map(ev => (
                                             <tr key={ev.id} className="hover:bg-slate-50/50 transition-colors">
                                                 <td className="p-4 align-middle">
                                                     <span className="font-bold text-gray-850 hover:text-purple-700 cursor-pointer block" onClick={() => setSelectedEventForModal(ev)}>
@@ -1025,7 +1037,15 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                                 </tbody>
                             </table>
                         </div>
-                    </div>
+                        <PaginationControls
+                            currentPage={eventPagination.currentPage}
+                            pageCount={eventPagination.pageCount}
+                            startIndex={eventPagination.startIndex}
+                            totalItems={finalEvents.length}
+                            itemLabel="événements"
+                            onPageChange={eventPagination.setCurrentPage}
+                        />
+                        </div>
                     </div>
                 )}
             </PageContainer>

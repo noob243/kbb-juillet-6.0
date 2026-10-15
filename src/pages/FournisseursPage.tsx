@@ -5,6 +5,8 @@ import { SearchIcon, UsersIcon, TrashIcon, CourthouseIcon, PhoneIcon, BriefcaseI
 import { Fournisseur } from '../types';
 import { AppUser } from '../types/rbac';
 import { canDeleteRecord } from '../services/rbacService';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface FournisseursPageProps {
   fournisseurs: Fournisseur[];
@@ -48,6 +50,7 @@ const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFourni
         (f.dirigeantPrincipal && f.dirigeantPrincipal.toLowerCase().includes(query)) ||
         (f.adressePhysique && f.adressePhysique.toLowerCase().includes(query))
     );
+    const pagination = usePagination<Fournisseur>(filtered, searchQuery);
 
     return (
         <>
@@ -94,7 +97,7 @@ const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFourni
                                             </td>
                                         </tr>
                                     ) : (
-                                        filtered.map(f => {
+                                        pagination.visibleItems.map(f => {
                                             const isSelected = selectedFournisseur?.id === f.id;
                                             return (
                                                 <tr 
@@ -201,6 +204,14 @@ const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFourni
                                 </tbody>
                             </table>
                         </div>
+                        <PaginationControls
+                            currentPage={pagination.currentPage}
+                            pageCount={pagination.pageCount}
+                            startIndex={pagination.startIndex}
+                            totalItems={filtered.length}
+                            itemLabel="fournisseurs"
+                            onPageChange={pagination.setCurrentPage}
+                        />
                     </div>
 
                     {/* Detailed supplier sidebar info */}

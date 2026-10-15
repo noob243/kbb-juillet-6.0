@@ -12,6 +12,8 @@ import { Client, Case, Avocat, Correspondance } from '../types';
 import { AppUser } from '../types/rbac';
 import { canDeleteRecord } from '../services/rbacService';
 import { motion, AnimatePresence } from 'motion/react';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface CorrespondancePageProps {
     clients: Client[];
@@ -136,9 +138,6 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
         return () => unsub();
     }, []);
 
-    // Limit initial display to 40 items with option to load more
-    const [displayLimit, setDisplayLimit] = useState<number>(40);
-
     // Active filters
     const filteredCorrespondances = useMemo(() => {
         return correspondances.filter(c => {
@@ -163,6 +162,7 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
             return matchesSearch && matchesAvocat && matchesStatus && matchesNature;
         });
     }, [correspondances, searchTerm, filterAvocatId, filterStatus, filterNature]);
+    const pagination = usePagination<Correspondance>(filteredCorrespondances, `${searchTerm}:${filterAvocatId}:${filterStatus}:${filterNature}`);
 
     // Prepopulate composer form when starting a new correspondence
     const startNewCorrespondence = () => {
@@ -582,7 +582,7 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
                             </div>
                         ) : (
                             <>
-                                {filteredCorrespondances.slice(0, displayLimit).map(corr => {
+                                {pagination.visibleItems.map(corr => {
                                 const isSelected = selectedCorr?.id === corr.id;
                                 const isReceived = corr.nature === 'Reçue' || corr.nature === 'Reçue / Perçue' || corr.id?.startsWith('KBB-RECEPT');
                                 return (
@@ -653,23 +653,16 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
                                 );
                             })}
 
-                            {filteredCorrespondances.length > 40 && (
-                                <div className="pt-2 pb-1 flex flex-col gap-2 items-center text-xs">
-                                    <span className="text-slate-500 text-[11px]">
-                                        Affichage de {Math.min(displayLimit, filteredCorrespondances.length)} sur {filteredCorrespondances.length}
-                                    </span>
-                                    {filteredCorrespondances.length > displayLimit && (
-                                        <button
-                                            onClick={() => setDisplayLimit(prev => prev + 40)}
-                                            className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition cursor-pointer"
-                                        >
-                                            Voir plus (+40)
-                                        </button>
-                                    )}
-                                </div>
-                            )}
                             </>
                         )}
+                        <PaginationControls
+                            currentPage={pagination.currentPage}
+                            pageCount={pagination.pageCount}
+                            startIndex={pagination.startIndex}
+                            totalItems={filteredCorrespondances.length}
+                            itemLabel="correspondances"
+                            onPageChange={pagination.setCurrentPage}
+                        />
                     </div>
                 </div>
 

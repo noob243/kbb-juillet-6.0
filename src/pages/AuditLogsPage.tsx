@@ -28,6 +28,8 @@ import { AuditLog } from '../types';
 import { AppUser } from '../types/rbac';
 import { syncUsersWithFirestore, updateAppUser } from '../services/userService';
 import { dbCreateAuditLog } from '../lib/firestoreService';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface AuditLogsPageProps {
   logs: AuditLog[];
@@ -42,9 +44,6 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
     const [moduleFilter, setModuleFilter] = useState<string>('all');
     const [userFilter, setUserFilter] = useState<string>('all');
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
-
-    // Limit display to 40 recent logs by default with option to load more
-    const [displayLimit, setDisplayLimit] = useState<number>(40);
 
     // Users and active sessions state
     const [usersList, setUsersList] = useState<AppUser[]>([]);
@@ -233,6 +232,7 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
             return valB - valA;
         });
     }, [safeLogs, searchQuery, actionFilter, moduleFilter, userFilter]);
+    const pagination = usePagination<AuditLog>(filteredLogs, `${searchQuery}:${actionFilter}:${moduleFilter}:${userFilter}`);
 
     // Handle CSV Export
     const handleExportCSV = () => {
@@ -710,7 +710,7 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
                         </thead>
                         <tbody className="divide-y divide-gray-100 dark:divide-slate-800/80">
                             {filteredLogs.length > 0 ? (
-                                filteredLogs.slice(0, displayLimit).map((log, idx) => {
+                                pagination.visibleItems.map((log, idx) => {
                                     const uName = log.userName || 'Utilisateur';
                                     const uEmail = log.userEmail || '';
                                     const aType = log.actionType || 'Action';
@@ -796,43 +796,14 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
                     </table>
                 </div>
 
-                {/* Pagination / Load More Bar */}
-                {filteredLogs.length > 40 && (
-                    <div className="p-4 bg-slate-50/80 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                        <span className="text-gray-500 dark:text-slate-400 font-medium">
-                            Affichage de <strong className="text-gray-800 dark:text-slate-200">{Math.min(displayLimit, filteredLogs.length)}</strong> sur <strong className="text-gray-800 dark:text-slate-200">{filteredLogs.length}</strong> logs récents
-                        </span>
-                        
-                        <div className="flex items-center gap-2">
-                            {filteredLogs.length > displayLimit && (
-                                <button
-                                    onClick={() => setDisplayLimit(prev => prev + 40)}
-                                    className="px-4 py-2 bg-[#15447c] hover:bg-[#1d5b9f] dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-bold rounded-xl shadow-xs transition duration-150 cursor-pointer"
-                                >
-                                    Voir plus (+40 logs)
-                                </button>
-                            )}
-
-                            {displayLimit < filteredLogs.length && (
-                                <button
-                                    onClick={() => setDisplayLimit(filteredLogs.length)}
-                                    className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer"
-                                >
-                                    Tout afficher
-                                </button>
-                            )}
-
-                            {displayLimit > 40 && (
-                                <button
-                                    onClick={() => setDisplayLimit(40)}
-                                    className="px-3 py-2 bg-slate-200 dark:bg-slate-800 text-gray-600 dark:text-slate-400 font-bold rounded-xl hover:bg-slate-300 transition cursor-pointer"
-                                >
-                                    Réduire à 40
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                )}
+                <PaginationControls
+                    currentPage={pagination.currentPage}
+                    pageCount={pagination.pageCount}
+                    startIndex={pagination.startIndex}
+                    totalItems={filteredLogs.length}
+                    itemLabel="logs récents"
+                    onPageChange={pagination.setCurrentPage}
+                />
             </div>
 
             {/* Detailed Log modal */}

@@ -4,6 +4,8 @@ import { db } from '../firebase';
 import { ChatIcon } from '../components/Icons';
 import { AppUser } from '../types/rbac';
 import { ArrowLeft, Send, Search, CheckCheck, Clock, Users, Building2, MessageSquare } from 'lucide-react';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 export interface ForumReply {
     id: number;
@@ -498,6 +500,8 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
         const matchesCategory = selectedCategoryFilter === 'Tous' || topic.category === selectedCategoryFilter;
         return matchesSearch && matchesCategory;
     });
+    const contactsPagination = usePagination<ChatContact>(filteredChatUsers, searchTerm);
+    const topicsPagination = usePagination<ForumTopic>(filteredForumTopics, `${forumSearchTerm}:${selectedCategoryFilter}`);
 
     const activeForumTopic = forumTopics.find(t => t.id === selectedTopicId) || null;
 
@@ -653,7 +657,7 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
                                         Aucun collaborateur trouvé pour "{searchTerm}"
                                     </li>
                                 ) : (
-                                    filteredChatUsers.map(person => {
+                                    contactsPagination.visibleItems.map(person => {
                                         const lastMsg = getLastMessage(person.email, person.name);
                                         const isSelected = selectedContact?.email === person.email && !selectedContact?.isGeneral;
                                         return (
@@ -732,6 +736,14 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
                                     );
                                 }))}
                             </ul>
+                            <PaginationControls
+                                currentPage={contactsPagination.currentPage}
+                                pageCount={contactsPagination.pageCount}
+                                startIndex={contactsPagination.startIndex}
+                                totalItems={filteredChatUsers.length}
+                                itemLabel="contacts"
+                                onPageChange={contactsPagination.setCurrentPage}
+                            />
                         </div>
 
                         {/* Right Side: Active conversation stream */}
@@ -958,7 +970,7 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
                                         Aucun sujet correspondant dans le forum.
                                     </li>
                                 ) : (
-                                    filteredForumTopics.map(topic => (
+                                    topicsPagination.visibleItems.map(topic => (
                                         <li key={topic.id}>
                                             <button
                                                 type="button"
@@ -988,6 +1000,14 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
                                     ))
                                 )}
                             </ul>
+                            <PaginationControls
+                                currentPage={topicsPagination.currentPage}
+                                pageCount={topicsPagination.pageCount}
+                                startIndex={topicsPagination.startIndex}
+                                totalItems={filteredForumTopics.length}
+                                itemLabel="sujets"
+                                onPageChange={topicsPagination.setCurrentPage}
+                            />
                         </div>
 
                         {/* Right Subpanel: Topic Creator or Selected Thread */}

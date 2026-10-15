@@ -8,6 +8,8 @@ import { AppUser } from '../types/rbac';
 import { hasPermission, canViewFinancialStats } from '../services/rbacService';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Eye, Mail, Lock, ExternalLink } from 'lucide-react';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface BillingPageProps {
   invoices: Invoice[];
@@ -26,7 +28,6 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDetailInvoice, setSelectedDetailInvoice] = useState<Invoice | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [displayLimit, setDisplayLimit] = useState<number>(40);
 
     const canAccessCases = hasPermission(currentUser, 'cases');
     const canAccessClients = hasPermission(currentUser, 'clients');
@@ -70,6 +71,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
         const searchTarget = `${invoice.id} ${invoice.status} ${invoice.dueDate} ${invoice.etiquette || ''} ${relatedCase ? relatedCase.name : ''}`.toLowerCase();
         return searchTarget.includes(searchQuery.toLowerCase());
     });
+    const pagination = usePagination<Invoice>(filteredInvoices, searchQuery);
 
     // Prepare chronological data for Recharts AreaChart
     const getChartData = () => {
@@ -350,7 +352,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredInvoices.slice(0, displayLimit).map(invoice => {
+                                    pagination.visibleItems.map(invoice => {
                                         const relatedCase = cases.find(c => c.id === invoice.caseId);
                                         const remainingAmount = Math.max(0, invoice.totalAmount - invoice.paidAmount);
                                         return (
@@ -452,33 +454,14 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                         </table>
                     </div>
 
-                    {filteredInvoices.length > 40 && (
-                        <div className="p-4 bg-slate-50/80 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                            <span className="text-gray-500 dark:text-slate-400 font-medium">
-                                Affichage de <strong className="text-gray-800 dark:text-slate-200">{Math.min(displayLimit, filteredInvoices.length)}</strong> sur <strong className="text-gray-800 dark:text-slate-200">{filteredInvoices.length}</strong> factures
-                            </span>
-                            
-                            <div className="flex items-center gap-2">
-                                {filteredInvoices.length > displayLimit && (
-                                    <button
-                                        onClick={() => setDisplayLimit(prev => prev + 40)}
-                                        className="px-4 py-2 bg-[#15447c] hover:bg-[#1d5b9f] text-white font-bold rounded-xl shadow-xs transition duration-150 cursor-pointer"
-                                    >
-                                        Voir plus (+40)
-                                    </button>
-                                )}
-
-                                {displayLimit < filteredInvoices.length && (
-                                    <button
-                                        onClick={() => setDisplayLimit(filteredInvoices.length)}
-                                        className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer"
-                                    >
-                                        Tout afficher
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    <PaginationControls
+                        currentPage={pagination.currentPage}
+                        pageCount={pagination.pageCount}
+                        startIndex={pagination.startIndex}
+                        totalItems={filteredInvoices.length}
+                        itemLabel="factures"
+                        onPageChange={pagination.setCurrentPage}
+                    />
                 </div>
             </PageContainer>
             

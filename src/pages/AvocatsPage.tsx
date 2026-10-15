@@ -5,6 +5,8 @@ import { PhoneIcon, MailIcon, CalendarIcon, CourthouseIcon, SearchIcon, CheckIco
 import { Avocat, Task, Correspondance } from '../types';
 import { AppUser } from '../types/rbac';
 import { canDeleteRecord } from '../services/rbacService';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface AvocatsPageProps {
   avocats: Avocat[];
@@ -75,6 +77,7 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
             (av.phone && av.phone.includes(query))
         );
     });
+    const pagination = usePagination(filteredAvocats, searchQuery);
 
     const reportAvocat = avocats.find(a => a.id === selectedLawyerReportId) || avocats[0];
     const reportTasks = reportAvocat ? tasks.filter(t => isTaskAssignedToLawyer(t, reportAvocat.fullName)) : [];
@@ -160,7 +163,7 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredAvocats.map(avocat => (
+                                        pagination.visibleItems.map(avocat => (
                                             <tr key={avocat.id} className="border-b border-gray-150 hover:bg-slate-50/70 transition">
                                                 <td className="p-4">
                                                     <div className="flex items-center gap-3">
@@ -246,6 +249,14 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                 </tbody>
                             </table>
                         </div>
+                        <PaginationControls
+                            currentPage={pagination.currentPage}
+                            pageCount={pagination.pageCount}
+                            startIndex={pagination.startIndex}
+                            totalItems={filteredAvocats.length}
+                            itemLabel="avocats"
+                            onPageChange={pagination.setCurrentPage}
+                        />
                     </div>
                 ) : (
                     /* Personal Report / Workload View */

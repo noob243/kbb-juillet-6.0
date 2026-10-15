@@ -4,6 +4,8 @@ import PageContainer from '../components/PageContainer';
 import EventModal from '../components/modals/EventModal';
 import { CalendarIcon, MapPinIcon, HandshakeIcon, AttachmentIcon, FolderIcon, UsersIcon, SearchIcon, EditIcon, ClipboardIcon } from '../components/Icons';
 import { Event, Avocat, EventReport, Personnel } from '../types';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface EventsPageProps {
   events: Event[];
@@ -16,6 +18,7 @@ interface EventsPageProps {
 }
 
 const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, avocats = [], personnels = [], onLoadMoreEvents, hasMoreEvents }) => {
+    const pagination = usePagination<Event>(events);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
     const [isAllReportsModalOpen, setIsAllReportsModalOpen] = useState<boolean>(false);
@@ -39,6 +42,7 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
     ).sort((a, b) => b.id.localeCompare(a.id));
 
     const totalReportsCount = allReports.length;
+    const reportsPagination = usePagination<(typeof allReports)[number]>(allReports);
 
     const getEventDescription = (event: Event) => {
         switch (event.type) {
@@ -190,7 +194,7 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
                             </tr>
                         </thead>
                         <tbody>
-                            {events.map(event => (
+                            {pagination.visibleItems.map(event => (
                                 <tr key={event.id} className="border-b border-gray-200 hover:bg-slate-50/50">
                                     <td className="p-4 font-medium text-gray-800">
                                         <div className="flex items-center gap-3">
@@ -270,6 +274,14 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
                         </tbody>
                     </table>
                 </div>
+                <PaginationControls
+                    currentPage={pagination.currentPage}
+                    pageCount={pagination.pageCount}
+                    startIndex={pagination.startIndex}
+                    totalItems={events.length}
+                    itemLabel="événements"
+                    onPageChange={pagination.setCurrentPage}
+                />
                 {hasMoreEvents && onLoadMoreEvents && (
                     <div className="mt-4 text-center">
                         <button
@@ -895,7 +907,7 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {allReports.map((report) => (
+                                    {reportsPagination.visibleItems.map((report) => (
                                         <div key={report.id} className="p-5 bg-slate-50 border border-gray-200 rounded-xl space-y-3 shadow-xs relative hover:border-indigo-200 transition-all duration-200">
                                             <div className="flex flex-wrap justify-between items-start gap-2 pb-2 border-b border-gray-200">
                                                 <div>
@@ -957,6 +969,14 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
                                 Revenir à la liste
                             </button>
                         </div>
+                        <PaginationControls
+                            currentPage={reportsPagination.currentPage}
+                            pageCount={reportsPagination.pageCount}
+                            startIndex={reportsPagination.startIndex}
+                            totalItems={allReports.length}
+                            itemLabel="rapports"
+                            onPageChange={reportsPagination.setCurrentPage}
+                        />
                     </div>
                 </div>
             )}

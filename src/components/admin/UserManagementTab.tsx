@@ -7,6 +7,8 @@ import { createAuthAccountIfPossible } from '../../firebase';
 import { PermissionMatrix } from './PermissionMatrix';
 import { dbCreateDoc, sanitizeForFirestore } from '../../lib/firestoreService';
 import { FormField, FormInput, FormSelect } from '../common/FormControls';
+import { usePagination } from '../../hooks/usePagination';
+import PaginationControls from '../common/PaginationControls';
 
 const BAR_OPTIONS = [
   'Kinshasa-Gombe',
@@ -359,6 +361,9 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
     (u.email || '').toLowerCase().includes(query) ||
     (u.functionRole || '').toLowerCase().includes(query)
   );
+  const editUsersPagination = usePagination(filteredActiveUsers, searchEditQuery);
+  const activeUsersPagination = usePagination(activeUsers, activeSubTab);
+  const archivedUsersPagination = usePagination(archivedUsers, activeSubTab);
 
   return (
     <div className="space-y-6">
@@ -1166,7 +1171,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
-                {filteredActiveUsers.map((u, index) => {
+                {editUsersPagination.visibleItems.map((u, index) => {
                   const handleForceLogout = async (user: AppUser) => {
                     if (!window.confirm(`Déconnecter l'utilisateur ${user.fullName} ?`)) return;
                     try {
@@ -1241,6 +1246,14 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
               </tbody>
             </table>
           </div>
+          <PaginationControls
+            currentPage={editUsersPagination.currentPage}
+            pageCount={editUsersPagination.pageCount}
+            startIndex={editUsersPagination.startIndex}
+            totalItems={filteredActiveUsers.length}
+            itemLabel="comptes"
+            onPageChange={editUsersPagination.setCurrentPage}
+          />
 
           {/* Edit Modal / Form Drawer */}
           {editingUserId && (
@@ -1409,7 +1422,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
               </h4>
 
               <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                {activeUsers.map((u, index) => (
+                {activeUsersPagination.visibleItems.map((u, index) => (
                   <div
                     key={u.id ? `softdel-${u.id}` : `softdel-user-${u.email || index}`}
                     className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between"
@@ -1437,6 +1450,14 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                   </div>
                 ))}
               </div>
+              <PaginationControls
+                currentPage={activeUsersPagination.currentPage}
+                pageCount={activeUsersPagination.pageCount}
+                startIndex={activeUsersPagination.startIndex}
+                totalItems={activeUsers.length}
+                itemLabel="comptes actifs"
+                onPageChange={activeUsersPagination.setCurrentPage}
+              />
             </div>
 
             {/* Archived Users */}
@@ -1452,7 +1473,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                     Aucun compte utilisateur n'est archivé actuellement.
                   </div>
                 ) : (
-                  archivedUsers.map((u, index) => (
+                  archivedUsersPagination.visibleItems.map((u, index) => (
                     <div
                       key={u.id ? `archived-${u.id}` : `archived-user-${u.email || index}`}
                       className="p-3 bg-rose-50/30 dark:bg-rose-950/20 rounded-xl border border-rose-200/50 dark:border-rose-900/40 flex items-center justify-between"
@@ -1473,6 +1494,14 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                   ))
                 )}
               </div>
+              <PaginationControls
+                currentPage={archivedUsersPagination.currentPage}
+                pageCount={archivedUsersPagination.pageCount}
+                startIndex={archivedUsersPagination.startIndex}
+                totalItems={archivedUsers.length}
+                itemLabel="comptes archivés"
+                onPageChange={archivedUsersPagination.setCurrentPage}
+              />
             </div>
           </div>
         </div>

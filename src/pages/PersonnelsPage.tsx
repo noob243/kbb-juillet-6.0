@@ -5,6 +5,8 @@ import { SearchIcon, AlertIcon, FolderIcon, PhoneIcon, MailIcon } from '../compo
 import { Personnel } from '../types';
 import { AppUser } from '../types/rbac';
 import { canDeleteRecord } from '../services/rbacService';
+import { usePagination } from '../hooks/usePagination';
+import PaginationControls from '../components/common/PaginationControls';
 
 interface PersonnelsPageProps {
   personnels: Personnel[];
@@ -61,6 +63,7 @@ const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, o
         if (selectedCategory === 'Tous') return true;
         return getEffectiveCategory(p) === selectedCategory;
     });
+    const pagination = usePagination<Personnel>(filtered, `${searchQuery}:${selectedCategory}`);
 
     return (
         <>
@@ -156,7 +159,7 @@ const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, o
                                         </td>
                                     </tr>
                                 ) : (
-                                    filtered.map(person => (
+                                    pagination.visibleItems.map(person => (
                                         <tr key={person.id} className="border-b border-gray-100 hover:bg-slate-50/50 transition">
                                             {/* Photo & Name */}
                                             <td className="p-4">
@@ -289,6 +292,14 @@ const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, o
                             </tbody>
                         </table>
                     </div>
+                    <PaginationControls
+                        currentPage={pagination.currentPage}
+                        pageCount={pagination.pageCount}
+                        startIndex={pagination.startIndex}
+                        totalItems={filtered.length}
+                        itemLabel="personnels"
+                        onPageChange={pagination.setCurrentPage}
+                    />
                 </div>
             </PageContainer>
 
