@@ -86,6 +86,9 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
     const reportCompletedTasks = reportTasks.filter(t => t.status === 'Effectué');
     const reportPendingTasks = reportTasks.filter(t => t.status !== 'Effectué');
     const reportHalfCompletedTasks = reportTasks.filter(t => t.status === 'Effectué à moitié');
+    const currentSelectedAvocat = selectedAvocat
+        ? avocats.find(avocat => avocat.id === selectedAvocat.id) || selectedAvocat
+        : null;
 
     return (
         <>
@@ -368,11 +371,12 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
             <AvocatModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={onAddAvocat} avocats={avocats} />
 
             {/* Avocat details modal */}
-            {selectedAvocat && (() => {
-                const lawyerTasks = tasks.filter(t => isTaskAssignedToLawyer(t, selectedAvocat.fullName));
+            {currentSelectedAvocat && (() => {
+                const avocatFiche = currentSelectedAvocat;
+                const lawyerTasks = tasks.filter(t => isTaskAssignedToLawyer(t, avocatFiche.fullName));
                 const signedLetters = correspondances.filter(c => 
-                    c.avocatSignataireId === selectedAvocat.id || 
-                    (c.author && c.author.toLowerCase() === selectedAvocat.fullName.toLowerCase())
+                    c.avocatSignataireId === avocatFiche.id ||
+                    (c.author && c.author.toLowerCase() === avocatFiche.fullName.toLowerCase())
                 );
                 
                 return (
@@ -381,28 +385,31 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                             {/* Header */}
                             <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
                                 <div className="flex items-center gap-4">
-                                    {selectedAvocat.photoUrl ? (
+                                    {avocatFiche.photoUrl ? (
                                         <img 
-                                            src={selectedAvocat.photoUrl} 
-                                            alt={selectedAvocat.fullName} 
+                                            src={avocatFiche.photoUrl}
+                                            alt={avocatFiche.fullName}
                                             className="w-14 h-14 rounded-full object-cover border border-slate-200 shadow-inner shrink-0" 
                                             referrerPolicy="no-referrer"
                                         />
                                     ) : (
                                         <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center text-xl font-extrabold text-[#15447c] shadow-inner shrink-0">
-                                            {selectedAvocat.fullName.split(' ').map(n => n[0]).join('')}
+                                            {avocatFiche.fullName.split(' ').map(n => n[0]).join('')}
                                         </div>
                                     )}
                                     <div>
-                                        <span className="text-2xs font-bold text-indigo-600 uppercase tracking-wider block mb-0.5">{selectedAvocat.cabinetRole || 'Avocat'} ({selectedAvocat.cabinetStatus})</span>
-                                        <h2 className="text-2xl font-extrabold text-gray-850 leading-tight">{selectedAvocat.fullName}</h2>
-                                        <p className="text-2xs font-mono text-gray-400 mt-1">Numéro ONA : <strong className="font-semibold text-gray-600">{selectedAvocat.onaNumber || 'N/A'}</strong></p>
+                                        <span className="text-2xs font-bold text-indigo-600 uppercase tracking-wider block mb-0.5">{avocatFiche.cabinetRole || 'Avocat'} ({avocatFiche.cabinetStatus})</span>
+                                        <h2 className="text-2xl font-extrabold text-gray-850 leading-tight">{avocatFiche.fullName}</h2>
+                                        <p className="text-2xs font-mono text-gray-400 mt-1">Numéro ONA : <strong className="font-semibold text-gray-600">{avocatFiche.onaNumber || 'N/A'}</strong></p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={() => void exportFicheToPdf('avocat', selectedAvocat)}
+                                        onClick={() => {
+                                            const latestAvocat = avocats.find(avocat => avocat.id === avocatFiche.id) || avocatFiche;
+                                            void exportFicheToPdf('avocat', latestAvocat);
+                                        }}
                                         className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#15447c] hover:bg-blue-900 text-white text-xs font-bold rounded-lg transition"
                                         title="Télécharger la fiche avocat en PDF"
                                     >
@@ -427,18 +434,18 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Contact Direct</span>
                                         <div className="text-xs text-gray-750 font-medium p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
-                                            <p className="flex items-center gap-1.5"><PhoneIcon className="w-3.5 h-3.5 text-indigo-600" /> {selectedAvocat.phone}</p>
+                                            <p className="flex items-center gap-1.5"><PhoneIcon className="w-3.5 h-3.5 text-indigo-600" /> {avocatFiche.phone}</p>
                                             <p className="flex items-center justify-between gap-1 border-t border-slate-150/50 pt-2 shrink-0">
                                                 <span className="flex items-center gap-1.5 truncate">
                                                     <MailIcon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                                                    <span className="truncate">{selectedAvocat.emails?.join(', ')}</span>
+                                                    <span className="truncate">{avocatFiche.emails?.join(', ')}</span>
                                                 </span>
                                                 <button
                                                     onClick={() => onSendEmail(
-                                                        selectedAvocat.emails?.[0] || 'avocat@kbblawfirmscp.com',
+                                                        avocatFiche.emails?.[0] || 'avocat@kbblawfirmscp.com',
                                                         `Instruction Interne Cabinet — Cabinet KBB SARL`,
-                                                        `Cher Maître ${selectedAvocat.fullName},\n\nDans le cadre de la gestion de nos affaires de cabinet...\n\nSentiments distingués,\nDirection Générale`,
-                                                        selectedAvocat.fullName
+                                                        `Cher Maître ${avocatFiche.fullName},\n\nDans le cadre de la gestion de nos affaires de cabinet...\n\nSentiments distingués,\nDirection Générale`,
+                                                        avocatFiche.fullName
                                                     )}
                                                     className="text-[10px] bg-indigo-100/60 hover:bg-indigo-100 text-indigo-850 font-bold px-2 py-0.5 rounded transition shrink-0 cursor-pointer"
                                                 >
@@ -450,9 +457,9 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
 
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Prestation de Serments</span>
-                                        <p className="text-xs text-gray-750 font-semibold leading-relaxed flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5 text-indigo-600" /> 1er Serment : {selectedAvocat.firstOathDate || 'N/A'}</p>
-                                        {selectedAvocat.secondOathDate && (
-                                            <p className="text-xs text-gray-750 font-semibold leading-relaxed mt-1 flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5 text-indigo-600" /> 2nd Serment : {selectedAvocat.secondOathDate}</p>
+                                        <p className="text-xs text-gray-750 font-semibold leading-relaxed flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5 text-indigo-600" /> 1er Serment : {avocatFiche.firstOathDate || 'N/A'}</p>
+                                        {avocatFiche.secondOathDate && (
+                                            <p className="text-xs text-gray-750 font-semibold leading-relaxed mt-1 flex items-center gap-1.5"><CalendarIcon className="w-3.5 h-3.5 text-indigo-600" /> 2nd Serment : {avocatFiche.secondOathDate}</p>
                                         )}
                                     </div>
 
@@ -461,13 +468,13 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                         <p className="text-xs text-slate-800 font-semibold leading-relaxed flex items-center gap-1.5">
                                             <CourthouseIcon className="w-3.5 h-3.5 text-indigo-600" />
                                             <span>Principal :</span>
-                                            <span className="bg-indigo-50 border border-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded text-2xs">{selectedAvocat.mainBar || 'Non spécifié'}</span>
+                                            <span className="bg-indigo-50 border border-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded text-2xs">{avocatFiche.mainBar || 'Non spécifié'}</span>
                                         </p>
-                                        {selectedAvocat.secondaryBar ? (
+                                        {avocatFiche.secondaryBar ? (
                                             <p className="text-xs text-slate-800 font-semibold leading-relaxed mt-1.5 flex items-center gap-1.5">
                                                 <CourthouseIcon className="w-3.5 h-3.5 text-indigo-600" />
                                                 <span>Secondaire :</span>
-                                                <span className="bg-slate-100 border border-slate-200 text-slate-705 font-bold px-1.5 py-0.5 rounded text-2xs">{selectedAvocat.secondaryBar}</span>
+                                                <span className="bg-slate-100 border border-slate-200 text-slate-705 font-bold px-1.5 py-0.5 rounded text-2xs">{avocatFiche.secondaryBar}</span>
                                             </p>
                                         ) : (
                                             <p className="text-2xs text-gray-400 italic mt-1 font-medium">Aucun barreau secondaire spécifié</p>
@@ -478,25 +485,25 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                 <div className="space-y-4">
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Statut de Service</span>
-                                        <span className={`inline-block px-2.5 py-1 rounded-full text-2xs font-bold uppercase tracking-wider mt-1 ${getServiceStatusClass(selectedAvocat.serviceStatus)}`}>
-                                            {selectedAvocat.serviceStatus} (depuis le {selectedAvocat.serviceStartDate})
+                                        <span className={`inline-block px-2.5 py-1 rounded-full text-2xs font-bold uppercase tracking-wider mt-1 ${getServiceStatusClass(avocatFiche.serviceStatus)}`}>
+                                            {avocatFiche.serviceStatus} (depuis le {avocatFiche.serviceStartDate})
                                         </span>
                                     </div>
 
                                     <div>
                                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Mesures Disciplinaires</span>
                                         <p className="text-xs text-gray-650 italic leading-relaxed bg-slate-50 border border-slate-100 p-2.5 rounded-lg">
-                                            {selectedAvocat.disciplinaryMeasures || "Aucune mesure ou sanction disciplinaire n'est recensée au dossier."}
+                                            {avocatFiche.disciplinaryMeasures || "Aucune mesure ou sanction disciplinaire n'est recensée au dossier."}
                                         </p>
                                     </div>
 
                                     <div>
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Comptes Bancaires ({selectedAvocat.bankAccounts?.length || 0})</span>
-                                        {!selectedAvocat.bankAccounts || selectedAvocat.bankAccounts.length === 0 ? (
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Comptes Bancaires ({avocatFiche.bankAccounts?.length || 0})</span>
+                                        {!avocatFiche.bankAccounts || avocatFiche.bankAccounts.length === 0 ? (
                                             <p className="text-xs text-gray-400 italic leading-relaxed bg-slate-50 border border-dashed border-gray-250 p-2.5 rounded-lg">Aucun compte bancaire configuré.</p>
                                         ) : (
                                             <div className="space-y-1.5 pt-1">
-                                                {selectedAvocat.bankAccounts.map((acc, idx) => (
+                                                {avocatFiche.bankAccounts.map((acc, idx) => (
                                                     <div key={idx} className="bg-indigo-50/45 border border-indigo-100 rounded-lg p-2 flex justify-between items-center text-xs font-semibold text-indigo-900 font-mono shadow-3xs">
                                                         <span className="font-bold">🏦 {acc.bankName}</span>
                                                         <span className="text-gray-600 select-all">{acc.accountNumber}</span>

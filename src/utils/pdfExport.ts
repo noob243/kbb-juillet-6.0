@@ -187,7 +187,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
   const titleText = customTitle || typeLabels[type] || `Fiche ${type.toUpperCase()}`;
   const recordId = item.id || item.dossierId || 'EXPORT';
   const safeRecordId = String(recordId).replace(/[^a-zA-Z0-9_-]/g, '_');
-  const exportDate = new Date().toLocaleDateString('fr-FR', {
+  const exportDate = new Date().toLocaleString('fr-FR', {
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
@@ -226,13 +226,13 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
       <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px;">
         <div>
           <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px;">
-            🏛️ CABINET D'AVOCATS KBB SARL
+            CABINET D’AVOCATS KBB LAW FIRM scp
           </div>
           <div style="font-size: 11px; font-weight: 700; color: #d97706; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px;">
             Plateforme Métier & Traçabilité Juridique
           </div>
           <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
-            Réf / ID: <strong>${escapeHtml(recordId)}</strong> | Exporté le : ${escapeHtml(exportDate)}
+            Réf. <strong>${escapeHtml(recordId)}</strong> · Exporté le ${escapeHtml(exportDate)}
           </div>
         </div>
         <div style="text-align: right;">
@@ -397,7 +397,7 @@ export async function exportListToPdf(
     return;
   }
 
-  const exportDate = new Date().toLocaleDateString('fr-FR', {
+  const exportDate = new Date().toLocaleString('fr-FR', {
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
@@ -421,9 +421,10 @@ export async function exportListToPdf(
       <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px;">
         <div>
           <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.5px;">
-            CABINET D'AVOCATS KBB LAW FIRM scp
+            CABINET D’AVOCATS KBB LAW FIRM scp
           </div>
           <div style="font-size: 11px; font-weight: 700; color: #d97706; margin-top: 2px; text-transform: uppercase;">
+            Cabinet d'Avocats
           </div>
           <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
             Exporté le : ${exportDate} | Total enregistrements : <strong>${rows.length}</strong>
@@ -462,7 +463,7 @@ export async function exportListToPdf(
 
       <!-- Footer -->
       <div style="margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #94a3b8;">
-        <div>Cabinet KBB - ERP de gestion & gouvernance unifiée</div>
+        <div>Cabinet KBB LAW FIRM scp</div>
         <div>Page 1 sur 1</div>
       </div>
     </div>
