@@ -1,5 +1,5 @@
 
-import React, { FC, useRef, useState } from 'react';
+import React, { FC, useEffect, useRef, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import CaseModal from '../components/modals/CaseModal';
 import InvoiceDetailModal from '../components/modals/InvoiceDetailModal';
@@ -62,11 +62,20 @@ const CasesPage: FC<CasesPageProps> = ({
     const [selectedCase, setSelectedCase] = useState<Case | null>(null);
     const [editingCase, setEditingCase] = useState<Case | null>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-    const [displayLimit, setDisplayLimit] = useState<number>(40);
+    const [currentPage, setCurrentPage] = useState(1);
     const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
     const selectedCaseContentRef = useRef<HTMLDivElement>(null);
 
     const activeUser = currentUser || currentUserInfo;
+    const pageSize = 10;
+    const pageCount = Math.ceil(safeCases.length / pageSize);
+    const visibleCases = safeCases.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+    useEffect(() => {
+        if (currentPage > pageCount) {
+            setCurrentPage(Math.max(1, pageCount));
+        }
+    }, [currentPage, pageCount]);
 
     const downloadAttachment = async (file: { name?: string; content?: string }) => {
         if (!file.content) return;
@@ -208,13 +217,13 @@ const CasesPage: FC<CasesPageProps> = ({
                                     </td>
                                 </tr>
                             ) : (
-                                safeCases.slice(0, displayLimit).map((c, index) => {
+                                visibleCases.map((c, index) => {
                                     if (!c) return null;
                                     const caseInvoices = safeInvoices.filter(inv => inv && (inv.caseId || '').toLowerCase() === (c.id || '').toLowerCase());
                                     const isMasked = isCaseContentMasked(c);
                                     return (
                                     <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50">
-                                        <td className="p-4 text-center font-mono text-xs text-gray-400 font-bold">{index + 1}</td>
+                                        <td className="p-4 text-center font-mono text-xs text-gray-400 font-bold">{(currentPage - 1) * pageSize + index + 1}</td>
                                         <td className="p-4 font-mono text-xs text-indigo-900 font-bold">{c.id}</td>
                                         <td className="p-4 font-medium text-gray-800">
                                             <div className="font-semibold text-gray-850">{c.name}</div>
@@ -311,30 +320,30 @@ const CasesPage: FC<CasesPageProps> = ({
                         </tbody>
                     </table>
 
-                    {safeCases.length > 40 && (
+                    {pageCount > 1 && (
                         <div className="p-4 bg-slate-50/80 dark:bg-slate-900/40 border-t border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
                             <span className="text-gray-500 dark:text-slate-400 font-medium">
-                                Affichage de <strong className="text-gray-800 dark:text-slate-200">{Math.min(displayLimit, safeCases.length)}</strong> sur <strong className="text-gray-800 dark:text-slate-200">{safeCases.length}</strong> dossiers
+                                Affichage de <strong className="text-gray-800 dark:text-slate-200">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, safeCases.length)}</strong> sur <strong className="text-gray-800 dark:text-slate-200">{safeCases.length}</strong> dossiers
                             </span>
-                            
-                            <div className="flex items-center gap-2">
-                                {safeCases.length > displayLimit && (
-                                    <button
-                                        onClick={() => setDisplayLimit(prev => prev + 40)}
-                                        className="px-4 py-2 bg-[#15447c] hover:bg-[#1d5b9f] text-white font-bold rounded-xl shadow-xs transition duration-150 cursor-pointer"
-                                    >
-                                        Voir plus (+40)
-                                    </button>
-                                )}
 
-                                {displayLimit < safeCases.length && (
-                                    <button
-                                        onClick={() => setDisplayLimit(safeCases.length)}
-                                        className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer"
-                                    >
-                                        Tout afficher
-                                    </button>
-                                )}
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3.5 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-gray-700 dark:text-slate-200 font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Précédent
+                                </button>
+                                <span className="px-2 font-bold text-gray-600 dark:text-slate-300">
+                                    Page {currentPage} / {pageCount}
+                                </span>
+                                <button
+                                    onClick={() => setCurrentPage(page => Math.min(pageCount, page + 1))}
+                                    disabled={currentPage === pageCount}
+                                    className="px-3.5 py-2 bg-[#15447c] hover:bg-[#1d5b9f] text-white font-bold rounded-xl shadow-xs transition duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Suivante
+                                </button>
                             </div>
                         </div>
                     )}
