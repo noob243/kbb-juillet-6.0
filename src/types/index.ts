@@ -43,6 +43,7 @@ export interface Case {
   id: string;
   name: string;
   client: string;
+  clientId?: string | number;
   status: 'Nouveau' | 'En cours' | 'En attente' | 'Clôturé';
   nextHearing: string | null;
   procedure?: string;
@@ -258,5 +259,4 @@ export interface Correspondance {
   dateReception?: string;
   piecesJointes?: Array<{ name: string; size: string; content?: string }>;
 }
-
 

@@ -24,6 +24,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Client, Case, Invoice, Task } from '../types';
+import { isActiveCase, isCaseForClient } from '../utils/caseHelpers';
 
 interface ClientsPageProps {
   clients: Client[];
@@ -159,6 +160,9 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                 safeClients.map((client, index) => {
                                     if (!client) return null;
                                     const details = getClientDetails(client);
+                                    const activeCaseCount = safeCases.filter(caseRecord =>
+                                        isCaseForClient(caseRecord, client) && isActiveCase(caseRecord)
+                                    ).length;
                                     return (
                                     <tr key={client.id} className="hover:bg-slate-50/50 transition duration-150">
                                         <td className="p-4 pl-6 text-center w-14">
@@ -187,7 +191,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                         <td className="p-4">
                                             <span className="inline-flex items-center gap-1 font-extrabold text-2xs px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-lg">
                                                 <Briefcase className="w-3 h-3 text-indigo-500" />
-                                                {client.cases} dossier{client.cases > 1 ? 's' : ''}
+                                                {activeCaseCount} dossier{activeCaseCount > 1 ? 's' : ''}
                                             </span>
                                         </td>
                                         <td className="p-4 text-right pr-6">
@@ -227,7 +231,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
             {/* Client Details Modal */}
             {selectedClient && (() => {
                 const details = getClientDetails(selectedClient);
-                const clientCases = cases.filter(c => (c.client || '').toLowerCase() === (selectedClient.name || '').toLowerCase());
+                const clientCases = safeCases.filter(c => isCaseForClient(c, selectedClient));
                 
                 // Indicators & stats calculation
                 const clientCaseIds = clientCases.map(c => c.id);
@@ -271,7 +275,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                         <span className="text-3xs font-bold text-slate-400 uppercase tracking-widest block">Dossiers</span>
                                         <span className="text-base font-black text-slate-800 block mt-1">{clientCases.length}</span>
                                         <span className="text-[10px] text-indigo-600 font-extrabold block mt-0.5">
-                                            {clientCases.filter(c => c.status === 'En cours').length} actifs
+                                            {clientCases.filter(isActiveCase).length} actifs
                                         </span>
                                     </div>
                                     <div className="p-3.5 bg-slate-50 border border-slate-150/60 rounded-xl">

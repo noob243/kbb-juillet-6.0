@@ -46,6 +46,7 @@ import { AppUser, ModuleKey, PersonnelCategory } from './types/rbac';
 import { ALL_MODULE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from './services/rbacService';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { safeSetItem, safeGetItem } from './utils/storageHelper';
+import { isActiveCase, isCaseForClient } from './utils/caseHelpers';
 
 declare const jspdf: any;
 
@@ -1145,7 +1146,11 @@ function App() {
 
     const handleExportClients = () => {
         const headers = ["Nom du Client", "Contact Principal", "Dossiers Actifs"];
-        const data = clients.map((c) => [c.name, c.contact, c.cases]);
+        const data = clients.map((client) => [
+            client.name,
+            client.contact,
+            cases.filter(caseRecord => isCaseForClient(caseRecord, client) && isActiveCase(caseRecord)).length
+        ]);
         handleExportPDF("Clients", headers, data);
     };
 

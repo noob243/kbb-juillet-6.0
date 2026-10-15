@@ -196,6 +196,7 @@ const CaseModal: FC<CaseModalProps> = ({
             id: formData.dossierId,
             name: formData.name,
             client: selectedClient ? selectedClient.name : 'N/A',
+            clientId: selectedClient?.id,
             status: formData.status,
             nextHearing: null,
             procedures: formData.procedures,
