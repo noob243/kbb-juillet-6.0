@@ -19,10 +19,12 @@ import {
   AlertCircle,
   Clock,
   User,
-  ArrowRight
+  ArrowRight,
+  Download
 } from 'lucide-react';
 import { usePagination } from '../hooks/usePagination';
 import PaginationControls from '../components/common/PaginationControls';
+import { exportFicheToPdf } from '../utils/pdfExport';
 
 interface ProceduresPageProps {
   cases: Case[];
@@ -406,6 +408,14 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
 
               {/* Actions Footer */}
               <div className="flex justify-end gap-2 border-t border-slate-50 dark:border-slate-800/30 pt-3.5 mt-4">
+                <button
+                  type="button"
+                  onClick={() => void exportFicheToPdf('procedure', proc, `Fiche de procédure — ${proc.name}`)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#15447c] hover:bg-blue-900 text-white rounded-lg text-xs font-extrabold transition"
+                  title="Télécharger la fiche procédure en PDF"
+                >
+                  <Download className="w-3.5 h-3.5" /> PDF
+                </button>
                 <button 
                   onClick={() => handleOpenEditModal(proc)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-[#15447c] rounded-lg text-xs font-extrabold transition"

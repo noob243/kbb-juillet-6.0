@@ -7,6 +7,8 @@ import { AppUser } from '../types/rbac';
 import { canDeleteRecord } from '../services/rbacService';
 import { usePagination } from '../hooks/usePagination';
 import PaginationControls from '../components/common/PaginationControls';
+import { exportFicheToPdf } from '../utils/pdfExport';
+import { Download } from 'lucide-react';
 
 interface AvocatsPageProps {
   avocats: Avocat[];
@@ -397,14 +399,26 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                         <p className="text-2xs font-mono text-gray-400 mt-1">Numéro ONA : <strong className="font-semibold text-gray-600">{selectedAvocat.onaNumber || 'N/A'}</strong></p>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={() => setSelectedAvocat(null)} 
-                                    className="p-1.5 hover:bg-slate-100 rounded-xl text-gray-400 hover:text-gray-600 transition"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void exportFicheToPdf('avocat', selectedAvocat)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#15447c] hover:bg-blue-900 text-white text-xs font-bold rounded-lg transition"
+                                        title="Télécharger la fiche avocat en PDF"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        PDF
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedAvocat(null)}
+                                        className="p-1.5 hover:bg-slate-100 rounded-xl text-gray-400 hover:text-gray-600 transition"
+                                        aria-label="Fermer la fiche avocat"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Main Grid */}

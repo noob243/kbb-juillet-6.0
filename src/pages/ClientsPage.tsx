@@ -21,12 +21,14 @@ import {
   Building2,
   ChevronRight,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  Download
 } from 'lucide-react';
 import { Client, Case, Invoice, Task } from '../types';
 import { isActiveCase, isCaseForClient } from '../utils/caseHelpers';
 import { usePagination } from '../hooks/usePagination';
 import PaginationControls from '../components/common/PaginationControls';
+import { exportFicheToPdf } from '../utils/pdfExport';
 
 interface ClientsPageProps {
   clients: Client[];
@@ -268,12 +270,24 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                         <span className="text-[10px] text-slate-400 font-mono">ID: {selectedClient.id}</span>
                                     </div>
                                 </div>
-                                <button 
-                                    onClick={() => setSelectedClient(null)} 
-                                    className="p-1.5 hover:bg-slate-100 rounded-xl text-gray-400 hover:text-gray-600 transition"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => void exportFicheToPdf('client', selectedClient)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#15447c] hover:bg-blue-900 text-white text-xs font-bold rounded-lg transition"
+                                        title="Télécharger la fiche client en PDF"
+                                    >
+                                        <Download className="w-4 h-4" />
+                                        PDF
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedClient(null)}
+                                        className="p-1.5 hover:bg-slate-100 rounded-xl text-gray-400 hover:text-gray-600 transition"
+                                        aria-label="Fermer la fiche client"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Indicators Bento Grid */}

@@ -22,6 +22,78 @@ export function formatFieldValue(val: any): string {
   return String(val);
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  fullName: 'Nom complet',
+  name: 'Nom',
+  client: 'Client associé',
+  clientName: 'Client associé',
+  caseId: 'Référence du dossier',
+  caseName: 'Dossier associé',
+  procedure: 'Procédure',
+  procedureInstance: 'Instance / juridiction',
+  procedureObjet: 'Objet de la procédure',
+  instance: 'Instance / juridiction',
+  objet: 'Objet',
+  dateDebut: 'Date de début',
+  dateFin: 'Date de fin',
+  nextHearing: 'Prochaine audience',
+  status: 'Statut',
+  cabinetRole: 'Fonction au cabinet',
+  cabinetStatus: 'Statut au cabinet',
+  serviceStatus: 'Statut de service',
+  onaNumber: 'Numéro ONA',
+  mainBar: 'Barreau principal',
+  secondaryBar: 'Barreaux secondaires',
+  firstOathDate: 'Date du premier serment',
+  secondOathDate: 'Date du second serment',
+  serviceStartDate: 'Début de service',
+  phone: 'Téléphone',
+  emails: 'Adresses e-mail',
+  email: 'Adresse e-mail',
+  contact: 'Contact principal',
+  denomination: 'Dénomination',
+  secteur: 'Secteur d’activité',
+  siege: 'Siège social',
+  sieges: 'Adresses sociales',
+  rccm: 'Numéro RCCM',
+  idNat: 'Identifiant national',
+  nImpot: 'Numéro d’impôt',
+  typeFacturation: 'Type de facturation',
+  totalAmount: 'Montant total',
+  paidAmount: 'Montant payé',
+  dueDate: 'Date d’échéance',
+  adversaire: 'Partie adverse',
+  adversaires: 'Parties adverses',
+  avocatTitulaire: 'Avocat titulaire',
+  avocatsSurDossier: 'Avocats associés au dossier',
+  tags: 'Étiquettes',
+  notes: 'Notes',
+  disciplinaryMeasures: 'Mesures disciplinaires',
+  address: 'Adresse',
+  role: 'Rôle',
+  category: 'Catégorie',
+  salary: 'Salaire',
+  date: 'Date',
+  lieu: 'Lieu',
+  subject: 'Objet',
+  recipientName: 'Destinataire',
+  author: 'Auteur',
+  title: 'Titre'
+};
+
+function formatFieldLabel(key: string): string {
+  return FIELD_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/^./, char => char.toUpperCase()).trim();
+}
+
 let pdfExportSequence = 0;
 
 function createPdfCaptureId(element: HTMLElement): string {
@@ -102,6 +174,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
   const typeLabels: Record<string, string> = {
     client: 'Fiche Client',
     case: 'Dossier Judiciaire',
+    procedure: 'Fiche Procédure',
     avocat: 'Fiche Avocat',
     personnel: 'Fiche Personnel',
     event: 'Fiche Événement',
@@ -113,6 +186,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
 
   const titleText = customTitle || typeLabels[type] || `Fiche ${type.toUpperCase()}`;
   const recordId = item.id || item.dossierId || 'EXPORT';
+  const safeRecordId = String(recordId).replace(/[^a-zA-Z0-9_-]/g, '_');
   const exportDate = new Date().toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
@@ -158,12 +232,12 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
             Plateforme Métier & Traçabilité Juridique
           </div>
           <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
-            Réf / ID: <strong>${recordId}</strong> | Exporté le : ${exportDate}
+            Réf / ID: <strong>${escapeHtml(recordId)}</strong> | Exporté le : ${escapeHtml(exportDate)}
           </div>
         </div>
         <div style="text-align: right;">
           <div style="background-color: #15447c; color: #ffffff; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 800; display: inline-block;">
-            ${titleText}
+            ${escapeHtml(titleText)}
           </div>
         </div>
       </div>
@@ -172,7 +246,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
       <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; padding: 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 16px;">
         ${photoOrLogo ? `
           <div style="width: 64px; height: 64px; border-radius: 50%; overflow: hidden; border: 2px solid #15447c; flex-shrink: 0; background: #ffffff;">
-            <img src="${photoOrLogo}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;" />
+            <img src="${escapeHtml(photoOrLogo)}" alt="Logo" style="width: 100%; height: 100%; object-fit: cover;" />
           </div>
         ` : `
           <div style="width: 56px; height: 56px; border-radius: 50%; background-color: #e0e7ff; color: #3730a3; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 900; flex-shrink: 0;">
@@ -181,10 +255,10 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
         `}
         <div>
           <h2 style="font-size: 18px; font-weight: 800; color: #0f172a; margin: 0;">
-            ${item.fullName || item.name || item.nomComplet || item.subject || 'Fiche Enregistrement'}
+            ${escapeHtml(item.fullName || item.name || item.nomComplet || item.subject || 'Fiche Enregistrement')}
           </h2>
           <p style="font-size: 12px; font-weight: 600; color: #475569; margin: 4px 0 0 0;">
-            ${item.cabinetStatus || item.role || item.client || item.secteur || item.status || 'Cabinet KBB'}
+            ${escapeHtml(item.cabinetStatus || item.role || item.client || item.secteur || item.status || 'Cabinet KBB')}
           </p>
         </div>
       </div>
@@ -198,10 +272,10 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
           ${fieldEntries.map(([key, val]) => `
             <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px;">
               <span style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; display: block; margin-bottom: 2px;">
-                ${key.replace(/([A-Z])/g, ' $1').trim()}
+                ${escapeHtml(formatFieldLabel(key))}
               </span>
               <span style="font-size: 11px; font-weight: 700; color: #1e293b;">
-                ${formatFieldValue(val)}
+                ${escapeHtml(formatFieldValue(val))}
               </span>
             </div>
           `).join('')}
@@ -217,8 +291,8 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
             ${bankAccounts.map((b: any) => `
               <div style="background-color: #eef2ff; border: 1px solid #c7d2fe; border-radius: 8px; padding: 8px 12px;">
-                <div style="font-size: 11px; font-weight: 800; color: #1e1b4b;">${b.bankName || 'Banque'}</div>
-                <div style="font-size: 10px; font-family: monospace; font-weight: 700; color: #3730a3;">${b.accountNumber || 'N/A'}</div>
+                <div style="font-size: 11px; font-weight: 800; color: #1e1b4b;">${escapeHtml(b.bankName || 'Banque')}</div>
+                <div style="font-size: 10px; font-family: monospace; font-weight: 700; color: #3730a3;">${escapeHtml(b.accountNumber || 'N/A')}</div>
               </div>
             `).join('')}
           </div>
@@ -234,8 +308,8 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
           <div style="display: flex; flex-direction: column; gap: 8px;">
             ${procedures.map((p: any) => `
               <div style="background-color: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 14px; font-size: 11px;">
-                <strong>${p.name || 'Procédure'}</strong> - <span style="color: #475569;">Instance: ${p.instance || 'N/A'}</span>
-                ${p.objet ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">Objet: ${p.objet}</div>` : ''}
+                <strong>${escapeHtml(p.name || 'Procédure')}</strong> - <span style="color: #475569;">Instance: ${escapeHtml(p.instance || 'N/A')}</span>
+                ${p.objet ? `<div style="font-size: 10px; color: #64748b; margin-top: 2px;">Objet: ${escapeHtml(p.objet)}</div>` : ''}
               </div>
             `).join('')}
           </div>
@@ -256,8 +330,8 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
             ${pieces.map((p: any) => `
               <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between;">
                 <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <div style="font-size: 11px; font-weight: 700; color: #0f172a;">📄 ${p.name || 'Fichier'}</div>
-                  <div style="font-size: 9px; color: #64748b; font-family: monospace;">Taille: ${p.size || 'N/A'}</div>
+                  <div style="font-size: 11px; font-weight: 700; color: #0f172a;">📄 ${escapeHtml(p.name || 'Fichier')}</div>
+                  <div style="font-size: 9px; color: #64748b; font-family: monospace;">Taille: ${escapeHtml(p.size || 'N/A')}</div>
                 </div>
                 <div style="background-color: #dcfce7; color: #166534; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">
                   Enregistré
@@ -289,7 +363,7 @@ export async function exportFicheToPdf(type: string, item: any, customTitle?: st
       const captureDimensions = getPdfRenderDimensions(container);
       const opt = {
         margin: 8,
-        filename: `fiche_${type}_${recordId}.pdf`,
+        filename: `fiche_${type}_${safeRecordId}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: createHtml2CanvasOptions(captureId, 2, captureDimensions.width, captureDimensions.height),
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -347,10 +421,9 @@ export async function exportListToPdf(
       <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; margin-bottom: 20px;">
         <div>
           <div style="font-size: 20px; font-weight: 900; color: #15447c; letter-spacing: -0.5px;">
-            🏛️ CABINET D'AVOCATS KBB SARL
+            CABINET D'AVOCATS KBB LAW FIRM scp
           </div>
           <div style="font-size: 11px; font-weight: 700; color: #d97706; margin-top: 2px; text-transform: uppercase;">
-            Consoles & Données Unifiées
           </div>
           <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
             Exporté le : ${exportDate} | Total enregistrements : <strong>${rows.length}</strong>

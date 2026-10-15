@@ -1,5 +1,5 @@
 
-import React, { FC, useEffect, useRef, useState } from 'react';
+import React, { FC, useEffect, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import CaseModal from '../components/modals/CaseModal';
 import InvoiceDetailModal from '../components/modals/InvoiceDetailModal';
@@ -8,7 +8,7 @@ import { AppUser } from '../types/rbac';
 import { Download, Eye, Mail, Lock, Unlock, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { isCaseContentMasked, canManageCaseConfidentiality, canViewRestrictedCaseContent } from '../services/rbacService';
 import { DetailedEditModal } from '../components/DetailedEditModal';
-import { exportElementToPdf } from '../utils/pdfExport';
+import { exportFicheToPdf } from '../utils/pdfExport';
 
 interface CasesPageProps {
   cases: Case[];
@@ -64,7 +64,6 @@ const CasesPage: FC<CasesPageProps> = ({
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
-    const selectedCaseContentRef = useRef<HTMLDivElement>(null);
 
     const activeUser = currentUser || currentUserInfo;
     const pageSize = 10;
@@ -362,7 +361,7 @@ const CasesPage: FC<CasesPageProps> = ({
                 
                 return (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-[60] flex justify-center items-center p-4">
-                        <div ref={selectedCaseContentRef} className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn">
+                        <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-fadeIn">
                             {/* Header */}
                             <div className="flex justify-between items-start mb-4 border-b border-gray-100 pb-4">
                                 <div className="flex-1 pr-4">
@@ -488,7 +487,27 @@ const CasesPage: FC<CasesPageProps> = ({
                                     <button
                                         type="button"
                                         data-pdf-ignore
-                                        onClick={() => selectedCaseContentRef.current && void exportElementToPdf(selectedCaseContentRef.current, `dossier_${selectedCase.id}`, selectedCaseContentRef.current.clientWidth)}
+                                        onClick={() => {
+                                            const downloadableCase = isMasked && !canViewContent
+                                                ? {
+                                                    id: selectedCase.id,
+                                                    name: selectedCase.name,
+                                                    client: selectedCase.client,
+                                                    status: selectedCase.status,
+                                                    nextHearing: selectedCase.nextHearing,
+                                                    avocatTitulaire: selectedCase.avocatTitulaire,
+                                                    avocatsSurDossier: selectedCase.avocatsSurDossier,
+                                                    adversaire: selectedCase.adversaire,
+                                                    adversaires: selectedCase.adversaires,
+                                                    tags: selectedCase.tags,
+                                                    procedure: selectedCase.procedure,
+                                                    procedureInstance: selectedCase.procedureInstance,
+                                                    procedureObjet: selectedCase.procedureObjet,
+                                                    procedures: selectedCase.procedures
+                                                }
+                                                : selectedCase;
+                                            void exportFicheToPdf('case', downloadableCase);
+                                        }}
                                         className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#15447c] hover:bg-blue-900 text-white text-xs font-bold rounded-lg transition"
                                         title="Exporter cette fiche dossier en PDF"
                                     >
