@@ -5,8 +5,17 @@ export const isCaseForClient = (caseRecord: Case, client: Client): boolean => {
         return true;
     }
 
-    return (caseRecord.client || '').trim().toLowerCase() === (client.name || '').trim().toLowerCase();
+    const caseClientName = (caseRecord.client || '').trim().toLowerCase();
+    const clientName = (client.name || '').trim().toLowerCase();
+
+    return Boolean(
+        caseClientName &&
+        clientName &&
+        (caseClientName === clientName ||
+            caseClientName.includes(clientName) ||
+            clientName.includes(caseClientName))
+    );
 };
 
 export const isActiveCase = (caseRecord: Case): boolean =>
-    caseRecord.status === 'En cours' || caseRecord.status === 'Nouveau';
+    ['en cours', 'nouveau'].includes((caseRecord.status || '').trim().toLowerCase());

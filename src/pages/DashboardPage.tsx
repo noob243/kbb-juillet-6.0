@@ -22,6 +22,7 @@ import { Client, Case, Event, Task, Invoice, Avocat, Personnel, TaskPriority } f
 import { AppUser } from '../types/rbac';
 import { canViewFinancialStats, hasPermission } from '../services/rbacService';
 import { Lock, ExternalLink } from 'lucide-react';
+import { isActiveCase, isCaseForClient } from '../utils/caseHelpers';
 
 interface DashboardPageProps {
   clients: Client[];
@@ -210,17 +211,7 @@ const DashboardPage: FC<DashboardPageProps> = ({ clients = [], cases = [], event
     });
 
     const clientsStats = clients.map(cl => {
-        const clientCases = cases.filter(c => {
-            if (!c) return false;
-            if (c.clientId && cl.id && c.clientId === cl.id) return true;
-            if (c.client && cl.name) {
-                const caseClientLower = c.client.toLowerCase().trim();
-                const clNameLower = cl.name.toLowerCase().trim();
-                if (caseClientLower === clNameLower) return true;
-                if (caseClientLower.includes(clNameLower) || clNameLower.includes(caseClientLower)) return true;
-            }
-            return false;
-        });
+        const clientCases = cases.filter(c => c && isCaseForClient(c, cl));
         const clientInvoices = (invoices || []).filter(inv => clientCases.some(c => c.id === inv.caseId));
         const totalBilled = clientInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
         const totalPaid = clientInvoices.reduce((sum, inv) => sum + (inv.paidAmount || 0), 0);
@@ -228,7 +219,7 @@ const DashboardPage: FC<DashboardPageProps> = ({ clients = [], cases = [], event
         const rawRate = totalBilled > 0 ? Math.round((totalPaid / totalBilled) * 100) : 0;
         const recoveryRate = rawRate > 100 ? 100 : rawRate;
 
-        const activeCount = clientCases.filter(c => c.status === 'En cours' || c.status === 'Nouveau').length;
+        const activeCount = clientCases.filter(isActiveCase).length;
 
         return {
             ...cl,
