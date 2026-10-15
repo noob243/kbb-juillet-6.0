@@ -46,7 +46,7 @@ export const PresentationPage: FC<PresentationPageProps> = ({ onAddToast }) => {
     {
       id: 1,
       badge: 'KBB LAW FIRM SCP',
-      title: 'Plateforme Intégrée de Gestion Métier & Traçabilité Juridique',
+      title: 'Présentation Institutionnelle KBB',
       subtitle: 'Guide de Fonctionnement, Bonnes Pratiques d\'Usage & Perspectives de Scalabilité',
       isDark: true,
       content: (

@@ -35,7 +35,7 @@ export async function generateCabinetPptx(): Promise<void> {
       fontSize: 16, fontFace: 'Calibri', color: '93C5FD', bold: true, charSpacing: 3
     });
 
-    slide.addText('Plateforme Intégrée de Gestion Métier\n& Traçabilité Juridique', {
+    slide.addText('Présentation Institutionnelle KBB', {
       x: 0.8, y: 1.7, w: 11.5, h: 1.8,
       fontSize: 34, fontFace: 'Calibri', color: 'FFFFFF', bold: true, lineSpacing: 42
     });
