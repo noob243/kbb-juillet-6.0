@@ -2,7 +2,7 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Icon, DashboardIcon, ClientsIcon, CasesIcon, EventsIcon, AgendaIcon, ChatIcon, BillingIcon, AvocatsIcon, StaffIcon, PersonnelsIcon, SuppliersIcon, LogoutIcon, EyeIcon, AIIcon } from './Icons';
 import { AppUser, ModuleKey, UserRole } from '../types/rbac';
-import { hasPermission, DEFAULT_ROLE_PERMISSIONS, ALL_MODULE_PERMISSIONS, canViewPresentation, canViewFinancialStats } from '../services/rbacService';
+import { hasPermission, DEFAULT_ROLE_PERMISSIONS, ALL_MODULE_PERMISSIONS, canViewPresentation, canAccessBilling } from '../services/rbacService';
 
 interface SidebarProps {
   currentPage: string;
@@ -80,7 +80,7 @@ const Sidebar: FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout, curr
         }
 
         if (pageName === 'Facturation') {
-            return canViewFinancialStats(effectiveUser);
+            return canAccessBilling(activeUser, currentUserInfo);
         }
 
         return hasPermission(effectiveUser, moduleKey);

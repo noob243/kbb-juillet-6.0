@@ -1712,7 +1712,7 @@ function App() {
             clients: filteredClients, 
             cases: filteredCases, 
             events: filteredEvents, 
-            tasks, invoices, avocats, lawyerNames, personnels, fournisseurs,
+            tasks, invoices, avocats, lawyerNames, personnels, fournisseurs, users: usersList,
             onAddClient: handleAddClient, onAddCase: handleAddCase, onAddEvent: handleAddEvent,
             onAddTask: handleAddTask, onAddInvoice: handleAddInvoice, onAddAvocat: handleAddAvocat, onAddPersonnel: handleAddPersonnel, onAddFournisseur: handleAddFournisseur,
             onDeleteClient: handleDeleteClient, onDeleteCase: handleDeleteCase, onDeleteAvocat: handleDeleteAvocat, onDeletePersonnel: handleDeletePersonnel, onDeleteFournisseur: handleDeleteFournisseur,
@@ -1757,7 +1757,7 @@ function App() {
                     />
                 </ProtectedGuard>
             );
-            case 'Facturation': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="billing"><BillingPage invoices={invoices} cases={filteredCases} currentUserInfo={currentUserInfo} onAddInvoice={handleAddInvoice} onSendEmail={triggerEmail} clients={clients} /></ProtectedGuard>;
+            case 'Facturation': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="billing"><BillingPage invoices={invoices} cases={filteredCases} currentUserInfo={currentUserInfo} currentUser={currentUserObj} avocats={avocats} users={usersList} onAddInvoice={handleAddInvoice} onSendEmail={triggerEmail} clients={clients} /></ProtectedGuard>;
             case 'Avocats': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="avocats"><AvocatsPage avocats={avocats} tasks={tasks} onAddAvocat={handleAddAvocat} onDeleteAvocat={handleDeleteAvocat} onSendEmail={triggerEmail} correspondances={correspondances} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Personnels': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="personnels"><PersonnelsPage personnels={personnels} onAddPersonnel={handleAddPersonnel} onDeletePersonnel={handleDeletePersonnel} onSendEmail={triggerEmail} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Fournisseurs': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="suppliers"><FournisseursPage fournisseurs={fournisseurs} onAddFournisseur={handleAddFournisseur} onDeleteFournisseur={handleDeleteFournisseur} onSendEmail={triggerEmail} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;

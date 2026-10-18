@@ -170,6 +170,10 @@ export function hasPermission(user: AppUser | null, moduleKey: ModuleKey): boole
     return canDeleteRecord(user);
   }
 
+  if (moduleKey === 'billing' && (user.role === 'Avocat' || user.userType === 'Avocat')) {
+    return true;
+  }
+
   // Primary Super Admin check
   const isSuperAdmin = user.role === 'Admin' ||
     user.isSuperAdmin === true ||
@@ -331,6 +335,22 @@ export function canViewFinancialStats(
   }
 
   return false;
+}
+
+export function canAccessBilling(
+  user: AppUser | null,
+  userInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null
+): boolean {
+  if (user?.isDeleted || user?.hasAppAccess === false) return false;
+
+  const isLawyer = user
+    ? user.role === 'Avocat' || user.userType === 'Avocat'
+    : userInfo?.role === 'Avocat';
+  if (isLawyer) {
+    return true;
+  }
+
+  return hasPermission(user, 'billing') || canViewFinancialStats(user, userInfo);
 }
 
 export function canViewPresentation(

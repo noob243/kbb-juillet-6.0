@@ -20,6 +20,7 @@ interface AllInterfacesPageProps {
     avocats: Avocat[];
     personnels: Personnel[];
     fournisseurs: Fournisseur[];
+    users?: AppUser[];
     lawyerNames: string[];
     currentUser?: AppUser | null;
     currentUserInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null;
@@ -68,7 +69,7 @@ const AllInterfacesPage: FC<AllInterfacesPageProps> = (props) => {
             </div>
              <div>
                 <h2 className="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-indigo-500">Facturation</h2>
-                <BillingPage invoices={props.invoices} cases={props.cases} clients={props.clients} onAddInvoice={props.onAddInvoice} onSendEmail={props.onSendEmail} />
+                <BillingPage invoices={props.invoices} cases={props.cases} clients={props.clients} avocats={props.avocats} users={props.users} currentUser={props.currentUser} currentUserInfo={props.currentUserInfo} onAddInvoice={props.onAddInvoice} onSendEmail={props.onSendEmail} />
             </div>
              <div>
                 <h2 className="text-2xl font-bold text-gray-700 mb-4 pb-2 border-b-2 border-indigo-500">Avocats</h2>

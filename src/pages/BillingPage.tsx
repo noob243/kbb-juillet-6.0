@@ -5,7 +5,7 @@ import InvoiceDetailModal from '../components/modals/InvoiceDetailModal';
 import { SearchIcon } from '../components/Icons';
 import { Invoice, Case, Client, Avocat } from '../types';
 import { AppUser } from '../types/rbac';
-import { hasPermission, canViewFinancialStats } from '../services/rbacService';
+import { hasPermission, canAccessBilling } from '../services/rbacService';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { Eye, Mail, Lock, ExternalLink } from 'lucide-react';
 import { usePagination } from '../hooks/usePagination';
@@ -121,7 +121,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
     };
 
     const chartData = getChartData();
-    const canSeeFinancials = canViewFinancialStats(currentUser, currentUserInfo);
+    const canSeeFinancials = canAccessBilling(currentUser, currentUserInfo);
 
     if (!canSeeFinancials) {
         return (
@@ -130,9 +130,9 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                     <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-100">
                         <Lock className="w-8 h-8" />
                     </div>
-                    <h2 className="text-xl font-black text-gray-800 mb-2">Accès Réservé aux Administrateurs & Associés</h2>
+                    <h2 className="text-xl font-black text-gray-800 mb-2">Accès non autorisé</h2>
                     <p className="text-sm text-gray-500 leading-relaxed mb-6">
-                        Les statistiques de facturation, de finance et le suivi de trésorerie sont des données sensibles réservées exclusivement aux Administrateurs et aux Associés du cabinet KBB.
+                        Votre compte ne dispose pas des autorisations nécessaires pour accéder à la facturation.
                     </p>
                     <button
                         onClick={() => onNavigate?.('Dashboard')}

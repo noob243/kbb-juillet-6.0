@@ -1,5 +1,6 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Invoice, Case, Avocat } from '../../types';
+import { AppUser } from '../../types/rbac';
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -9,7 +10,7 @@ interface InvoiceModalProps {
   invoices?: Invoice[];
   currentUserInfo?: { name: string; role: string; email: string } | null;
   avocats?: Avocat[];
-  users?: Array<{ id?: string; name: string; role?: string }>;
+  users?: AppUser[];
 }
 
 const InvoiceModal: FC<InvoiceModalProps> = ({ isOpen, onClose, onSave, cases, invoices = [], currentUserInfo, avocats = [], users = [] }) => {
@@ -38,11 +39,12 @@ const InvoiceModal: FC<InvoiceModalProps> = ({ isOpen, onClose, onSave, cases, i
         });
 
         users.forEach(u => {
-            if (u.name && !list.some(item => item.name.toLowerCase() === u.name.toLowerCase())) {
+            const name = u.fullName?.trim();
+            if (name && !u.isDeleted && u.status === 'Actif' && u.hasAppAccess !== false && !list.some(item => item.name.toLowerCase() === name.toLowerCase())) {
                 list.push({
-                    id: u.id || u.name,
-                    name: u.name,
-                    role: u.role || 'Personnel / Secrétariat'
+                    id: u.id || name,
+                    name,
+                    role: u.functionRole || u.role || 'Personnel / Secrétariat'
                 });
             }
         });
@@ -115,6 +117,10 @@ const InvoiceModal: FC<InvoiceModalProps> = ({ isOpen, onClose, onSave, cases, i
         e.preventDefault();
         if (!formData.caseId) {
             alert("Veuillez sélectionner un dossier.");
+            return;
+        }
+        if (selectedSignataireIds.length === 0) {
+            alert("Veuillez sélectionner au moins un signataire.");
             return;
         }
 
