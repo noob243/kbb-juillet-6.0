@@ -1,6 +1,7 @@
 import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import AvocatModal from '../components/modals/AvocatModal';
+import { DetailedEditModal } from '../components/DetailedEditModal';
 import { PhoneIcon, MailIcon, CalendarIcon, CourthouseIcon, SearchIcon, CheckIcon, AlertIcon } from '../components/Icons';
 import { Avocat, Task, Correspondance } from '../types';
 import { AppUser } from '../types/rbac';
@@ -14,6 +15,7 @@ interface AvocatsPageProps {
   avocats: Avocat[];
   tasks?: Task[];
   onAddAvocat: (avocat: Avocat, password?: string) => void;
+  onUpdateAvocat?: (avocat: Avocat) => void;
   onDeleteAvocat?: (id: string) => void;
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
   correspondances?: Correspondance[];
@@ -46,6 +48,7 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
     avocats = [], 
     tasks = [], 
     onAddAvocat, 
+    onUpdateAvocat,
     onDeleteAvocat, 
     onSendEmail, 
     correspondances = [],
@@ -55,6 +58,7 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
     const userCanDelete = canDeleteRecord(currentUser);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedAvocat, setSelectedAvocat] = useState<Avocat | null>(null);
+    const [editingAvocat, setEditingAvocat] = useState<Avocat | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState<'liste' | 'rapport'>('liste');
     const [selectedLawyerReportId, setSelectedLawyerReportId] = useState<string>(avocats[0]?.id || '');
@@ -213,6 +217,15 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
                                                         >
                                                             Voir profil
                                                         </button>
+                                                        {onUpdateAvocat && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditingAvocat(avocat)}
+                                                                className="text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-xl text-xs font-bold transition"
+                                                            >
+                                                                Modifier
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => {
                                                                 onSendEmail(
@@ -369,6 +382,19 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
             </PageContainer>
             
             <AvocatModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={onAddAvocat} avocats={avocats} />
+            {editingAvocat && onUpdateAvocat && (
+                <DetailedEditModal
+                    type="avocat"
+                    item={editingAvocat}
+                    clients={[]}
+                    avocats={avocats}
+                    onClose={() => setEditingAvocat(null)}
+                    onSave={(updatedAvocat) => {
+                        onUpdateAvocat(updatedAvocat as Avocat);
+                        setEditingAvocat(null);
+                    }}
+                />
+            )}
 
             {/* Avocat details modal */}
             {currentSelectedAvocat && (() => {

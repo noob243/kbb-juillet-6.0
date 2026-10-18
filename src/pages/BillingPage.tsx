@@ -2,6 +2,7 @@ import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import InvoiceModal from '../components/modals/InvoiceModal';
 import InvoiceDetailModal from '../components/modals/InvoiceDetailModal';
+import { DetailedEditModal } from '../components/DetailedEditModal';
 import { SearchIcon } from '../components/Icons';
 import { Invoice, Case, Client, Avocat } from '../types';
 import { AppUser } from '../types/rbac';
@@ -20,13 +21,15 @@ interface BillingPageProps {
   currentUserInfo?: { name: string; role: string; email: string; functionRole?: string } | null;
   currentUser?: AppUser | null;
   onAddInvoice: (invoice: Invoice) => void;
+  onUpdateInvoice?: (invoice: Invoice) => void;
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
   onNavigate?: (pageName: string, query?: string) => void;
 }
 
-const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avocats = [], users = [], currentUserInfo, currentUser, onAddInvoice, onSendEmail, onNavigate }) => {
+const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avocats = [], users = [], currentUserInfo, currentUser, onAddInvoice, onUpdateInvoice, onSendEmail, onNavigate }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDetailInvoice, setSelectedDetailInvoice] = useState<Invoice | null>(null);
+    const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     const canAccessCases = hasPermission(currentUser, 'cases');
@@ -428,6 +431,16 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                                         >
                                                             <Eye className="w-3.5 h-3.5" />
                                                         </button>
+                                                        {onUpdateInvoice && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setEditingInvoice(invoice)}
+                                                                className="text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 p-1.5 rounded-lg transition cursor-pointer"
+                                                                title="Modifier la facture"
+                                                            >
+                                                                Modifier
+                                                            </button>
+                                                        )}
                                                         <button
                                                             onClick={() => {
                                                                 const currentCase = cases.find(c => (c.id || '').toLowerCase() === (invoice.caseId || '').toLowerCase());
@@ -466,6 +479,20 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
             </PageContainer>
             
             <InvoiceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={onAddInvoice} cases={cases} invoices={invoices} currentUserInfo={currentUserInfo} avocats={avocats} users={users} />
+
+            {editingInvoice && onUpdateInvoice && (
+                <DetailedEditModal
+                    type="invoice"
+                    item={editingInvoice}
+                    clients={clients}
+                    avocats={avocats}
+                    onClose={() => setEditingInvoice(null)}
+                    onSave={(updatedInvoice) => {
+                        onUpdateInvoice(updatedInvoice as Invoice);
+                        setEditingInvoice(null);
+                    }}
+                />
+            )}
 
             <InvoiceDetailModal 
                 isOpen={!!selectedDetailInvoice}

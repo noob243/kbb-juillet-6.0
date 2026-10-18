@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Client, Case, Avocat, Personnel } from '../types';
+import { Client, Case, Avocat, Personnel, Event, EventReport } from '../types';
 import { compressAndOptimizeImage, validateImageFile, ACCEPTED_IMAGE_INPUT_ACCEPT } from '../utils/imageOptimizer';
 import { exportFicheToPdf } from '../utils/pdfExport';
+import { getEventDescription } from '../utils/eventHelpers';
 
 interface DetailedEditModalProps {
   type: 'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'invoice' | 'fournisseur';
@@ -155,6 +156,26 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
   const handleSave = () => {
     if (!formData) return;
     
+    if (type === 'event') {
+      const updatedEvent: Event = { ...formData };
+      if (updatedEvent.evolutionFinancement) {
+        const totalAttendu = updatedEvent.evolutionFinancement.reduce((total, funding) => total + (Number(funding.attendu) || 0), 0);
+        const totalRealise = updatedEvent.evolutionFinancement.reduce((total, funding) => total + (Number(funding.realise) || 0), 0);
+        updatedEvent.budgetPrevisionnel = String(totalAttendu);
+        updatedEvent.budgetRealise = String(totalRealise);
+        updatedEvent.recettesTotal = totalRealise;
+        updatedEvent.financement = updatedEvent.evolutionFinancement
+          .map(funding => `${funding.designation} (Attendu: $${funding.attendu}, Réalisé: $${funding.realise})`)
+          .join(', ');
+        updatedEvent.financements = updatedEvent.evolutionFinancement.map(funding => ({
+          label: funding.designation,
+          amount: String(funding.realise)
+        }));
+      }
+      onSave(updatedEvent);
+      return;
+    }
+
     // Synergistic sync for Case procedures backward compatibility
     if (type === 'case') {
       const up = { ...formData };
@@ -179,6 +200,40 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
     } else {
       onSave(formData);
     }
+  };
+
+  const eventFundingRows = formData.evolutionFinancement || [
+    {
+      designation: 'Cabinet KBB',
+      attendu: 0,
+      realise: Number(formData.financements?.find((funding: any) => ['Cabinet KBB', 'KBB'].includes(funding.label))?.amount) || 0
+    },
+    {
+      designation: 'Sponsors externe',
+      attendu: 0,
+      realise: Number(formData.financements?.find((funding: any) => ['Sponsors externe', 'Sponsors'].includes(funding.label))?.amount) || 0
+    },
+    { designation: 'Frais de participation', attendu: 0, realise: Number(formData.fraisParticipation) || 0 },
+    {
+      designation: 'Autre',
+      attendu: 0,
+      realise: Number(formData.autresRecettes) || Number(formData.financements?.find((funding: any) => ['Autre', 'Autres'].includes(funding.label))?.amount) || 0
+    }
+  ];
+  const eventReports: EventReport[] = formData.reports || [];
+
+  const updateEventFunding = (index: number, field: 'designation' | 'attendu' | 'realise', value: string) => {
+    handleFieldChange('evolutionFinancement', eventFundingRows.map((funding: Event['evolutionFinancement'][number], rowIndex: number) =>
+      rowIndex === index
+        ? { ...funding, [field]: field === 'designation' ? value : Number(value) || 0 }
+        : funding
+    ));
+  };
+
+  const updateEventReport = (index: number, field: keyof EventReport, value: string) => {
+    handleFieldChange('reports', eventReports.map((report, reportIndex) =>
+      reportIndex === index ? { ...report, [field]: value } : report
+    ));
   };
 
   const handleDownloadPdf = () => {
@@ -1480,6 +1535,141 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
                   onChange={(e) => handleFieldChange('partenaires', e.target.value)}
                   className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-extrabold uppercase tracking-wide text-gray-500 mb-1">Description administrative</label>
+                <textarea
+                  value={formData.descriptionAdministrative ?? getEventDescription(formData.type || 'Autre')}
+                  onChange={(e) => handleFieldChange('descriptionAdministrative', e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15 min-h-[80px]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-extrabold uppercase tracking-wide text-gray-500 mb-1">Membres KBB</label>
+                <textarea
+                  value={formData.membresKBB || ''}
+                  onChange={(e) => handleFieldChange('membresKBB', e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15 min-h-[72px]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-extrabold uppercase tracking-wide text-gray-500 mb-1">Membres externes</label>
+                <textarea
+                  value={formData.membresExternes || ''}
+                  onChange={(e) => handleFieldChange('membresExternes', e.target.value)}
+                  className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15 min-h-[72px]"
+                />
+              </div>
+              <div className="md:col-span-2 border border-slate-200 rounded-xl p-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h4 className="text-[10px] font-extrabold uppercase tracking-wide text-gray-600">Évolution de financement</h4>
+                  <button
+                    type="button"
+                    onClick={() => handleFieldChange('evolutionFinancement', [...eventFundingRows, { designation: '', attendu: 0, realise: 0 }])}
+                    className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold"
+                  >
+                    + Ajouter une ligne
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {eventFundingRows.map((funding: Event['evolutionFinancement'][number], index: number) => (
+                    <div key={`${index}-${funding.designation}`} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_1fr_1fr_auto] gap-2 items-end">
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 mb-1">Désignation</label>
+                        <input
+                          type="text"
+                          value={funding.designation}
+                          onChange={(e) => updateEventFunding(index, 'designation', e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 mb-1">Attendu ($)</label>
+                        <input
+                          type="number"
+                          value={funding.attendu}
+                          onChange={(e) => updateEventFunding(index, 'attendu', e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-500 mb-1">Réalisé ($)</label>
+                        <input
+                          type="number"
+                          value={funding.realise}
+                          onChange={(e) => updateEventFunding(index, 'realise', e.target.value)}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleFieldChange('evolutionFinancement', eventFundingRows.filter((_: Event['evolutionFinancement'][number], rowIndex: number) => rowIndex !== index))}
+                        className="h-8 px-2 text-rose-600 bg-rose-50 rounded-lg text-xs font-bold"
+                        aria-label="Supprimer cette ligne de financement"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="md:col-span-2 border border-slate-200 rounded-xl p-3">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h4 className="text-[10px] font-extrabold uppercase tracking-wide text-gray-600">Rapports d'événement ({eventReports.length})</h4>
+                  <button
+                    type="button"
+                    onClick={() => handleFieldChange('reports', [...eventReports, {
+                      id: `REP-${Date.now()}`,
+                      title: '',
+                      content: '',
+                      dateCreated: new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                      author: ''
+                    }])}
+                    className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold"
+                  >
+                    + Ajouter un rapport
+                  </button>
+                </div>
+                {eventReports.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">Aucun rapport enregistré pour cet événement.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {eventReports.map((report, index) => (
+                      <div key={report.id} className="border border-slate-100 rounded-xl p-3 space-y-2">
+                        <div className="flex justify-between items-center gap-3">
+                          <span className="text-[10px] font-bold text-slate-500">Rapport {index + 1}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleFieldChange('reports', eventReports.filter((_: EventReport, reportIndex: number) => reportIndex !== index))}
+                            className="text-[10px] font-bold text-rose-600"
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={report.title}
+                          onChange={(e) => updateEventReport(index, 'title', e.target.value)}
+                          placeholder="Titre du rapport"
+                          className="w-full p-2 border border-slate-300 rounded-lg text-xs font-semibold"
+                        />
+                        <input
+                          type="text"
+                          value={report.author || ''}
+                          onChange={(e) => updateEventReport(index, 'author', e.target.value)}
+                          placeholder="Auteur"
+                          className="w-full p-2 border border-slate-300 rounded-lg text-xs"
+                        />
+                        <textarea
+                          value={report.content}
+                          onChange={(e) => updateEventReport(index, 'content', e.target.value)}
+                          placeholder="Contenu du rapport"
+                          className="w-full p-2 border border-slate-300 rounded-lg text-xs min-h-[100px]"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>

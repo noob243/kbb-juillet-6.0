@@ -1,6 +1,7 @@
 import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import PersonnelModal from '../components/modals/PersonnelModal';
+import { DetailedEditModal } from '../components/DetailedEditModal';
 import { SearchIcon, AlertIcon, FolderIcon, PhoneIcon, MailIcon } from '../components/Icons';
 import { Personnel } from '../types';
 import { AppUser } from '../types/rbac';
@@ -11,16 +12,18 @@ import PaginationControls from '../components/common/PaginationControls';
 interface PersonnelsPageProps {
   personnels: Personnel[];
   onAddPersonnel: (personnel: Personnel, password?: string) => void;
+  onUpdatePersonnel?: (personnel: Personnel) => void;
   onDeletePersonnel: (id: string) => void;
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
   currentUser?: AppUser | null;
   currentUserInfo?: { email?: string; name?: string; role?: string };
 }
 
-const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, onDeletePersonnel, onSendEmail, currentUser }) => {
+const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, onUpdatePersonnel, onDeletePersonnel, onSendEmail, currentUser }) => {
     const userCanDelete = canDeleteRecord(currentUser);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedPersonnel, setSelectedPersonnel] = useState<Personnel | null>(null);
+    const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<'Tous' | 'Administratif' | 'Office'>('Tous');
 
@@ -253,6 +256,15 @@ const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, o
                                                     >
                                                         Voir Profil
                                                     </button>
+                                                    {onUpdatePersonnel && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setEditingPersonnel(person)}
+                                                            className="text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-lg text-2xs font-extrabold transition"
+                                                        >
+                                                            Modifier
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => {
                                                             onSendEmail(
@@ -309,6 +321,19 @@ const PersonnelsPage: FC<PersonnelsPageProps> = ({ personnels, onAddPersonnel, o
                 onSave={onAddPersonnel} 
                 personnels={personnels}
             />
+            {editingPersonnel && onUpdatePersonnel && (
+                <DetailedEditModal
+                    type="personnel"
+                    item={editingPersonnel}
+                    clients={[]}
+                    avocats={[]}
+                    onClose={() => setEditingPersonnel(null)}
+                    onSave={(updatedPersonnel) => {
+                        onUpdatePersonnel(updatedPersonnel as Personnel);
+                        setEditingPersonnel(null);
+                    }}
+                />
+            )}
 
             {/* Personnel Profile Modal Details */}
             {selectedPersonnel && (

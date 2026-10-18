@@ -83,6 +83,7 @@ export interface Event {
   partenaires?: string;
   coOrganisateur?: string;
   publicCible?: string;
+  descriptionAdministrative?: string;
   membresKBB?: string;
   membresExternes?: string;
   budgetPrevisionnel?: string;
@@ -259,4 +260,3 @@ export interface Correspondance {
   dateReception?: string;
   piecesJointes?: Array<{ name: string; size: string; content?: string }>;
 }
-
