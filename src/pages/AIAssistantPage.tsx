@@ -1,12 +1,14 @@
 
 import React, { FC, useState, useRef, useEffect, useMemo } from 'react';
-import { GoogleGenAI } from "@google/genai";
+import { httpsCallable } from 'firebase/functions';
 import { AIIcon } from '../components/Icons';
 import { Client, Case, Task, Invoice } from '../types';
 import { AppUser } from '../types/rbac';
 import { hasPermission } from '../services/rbacService';
 import { usePersistentState } from '../hooks/usePersistentState';
 import { FunctionalAiTable } from '../components/ai/FunctionalAiTable';
+import { functions } from '../firebase';
+import { safeRemoveItem } from '../utils/storageHelper';
 
 interface AIAssistantPageProps {
     clients: Client[];
@@ -46,7 +48,7 @@ const AIAssistantPage: FC<AIAssistantPageProps> = ({ clients, cases, tasks, invo
         feedback: null
     };
 
-    const [conversations, setConversations] = usePersistentState<Conversation[]>('kbb_ai_history', []);
+    const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isDarkMode, setIsDarkMode] = usePersistentState<boolean>('kbb_ai_dark_mode', false);
     const [currentConvId, setCurrentConvId] = useState<string | null>(null);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -59,6 +61,10 @@ const AIAssistantPage: FC<AIAssistantPageProps> = ({ clients, cases, tasks, invo
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [editBuffer, setEditBuffer] = useState<string>('');
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        safeRemoveItem('kbb_ai_history');
+    }, []);
 
     // Prepare a RBAC-filtered data summary for the AI context
     const dataContextSummary = useMemo(() => {
@@ -306,78 +312,23 @@ const AIAssistantPage: FC<AIAssistantPageProps> = ({ clients, cases, tasks, invo
         }
 
         try {
-            const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
-            
-            if (apiKey) {
-                const ai = new GoogleGenAI({ apiKey });
-                
-                const systemInstruction = `
-                    Tu es Otshudi AI (ou Otsudi IA), l'assistant intelligent et confidentiel du cabinet d'avocats KBB.
-                    
-                    L'utilisateur actuel en cours de session est : ${userName} (Rôle : ${userRole}).
-                    
-                    RÈGLES IMPÉRATIVES DE SÉCURITÉ ET CONTRÔLE D'ACCÈS AUX DONNÉES (RBAC) :
-                    1. CONTRÔLE STRICT DES HABILITATIONS : Tu dois STRICTEMENT respecter le rôle ("${userRole}") et les niveaux d'accès aux données.
-                    2. RESTRICTIONS DE DOMAINE :
-                       - Module Clients : ${canAccessClients ? 'AUTORISÉ' : 'NON AUTORISÉ (Accès strictement bloqué)'}
-                       - Module Dossiers : ${canAccessCases ? 'AUTORISÉ' : 'NON AUTORISÉ (Accès strictement bloqué)'}
-                       - Module Tâches/Agenda : ${canAccessTasks ? 'AUTORISÉ' : 'NON AUTORISÉ (Accès strictement bloqué)'}
-                       - Module Facturation/Finances : ${canAccessInvoices ? 'AUTORISÉ' : 'NON AUTORISÉ (Accès strictement bloqué)'}
-                    3. REFUS FORMEL ET DÉONTOLOGIQUE : Si l'utilisateur tente d'accéder à un domaine "NON AUTORISÉ", refuse formellement en indiquant que son rôle "${userRole}" n'a pas les droits nécessaires.
-                    4. DONNÉES ACCESSIBLES POUR CETTE SESSION :
-                    ${JSON.stringify(dataContextSummary)}
-    
-                    5. GÉNÉRATION DE TABLEAUX FONCTIONNELS ET STRUCTURÉS :
-                       - Quand l'utilisateur demande une liste, une synthèse, une comparaison ou un rapport, structure IMPÉRATIVEMENT ta réponse sous forme de TABLEAU Markdown clair et complet (| Colonne 1 | Colonne 2 | ...).
-                       - Inclus toujours une ligne d'en-tête et une ligne de séparation (|---|---|...).
-                       - Mets en valeur les identifiants clés (ex: **CI-2024-001**, **FACT-001**).
-                    6. Langue : Français soigné et professionnel.
-                `;
-
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
-                    contents: [
-                        ...messages.filter(m => m.role !== 'assistant' || m !== initialAssistantMessage).map(m => ({
-                            role: m.role === 'user' ? 'user' : 'model',
-                            parts: [{ text: m.content }]
-                        })),
-                        { role: 'user', parts: [{ text: messageToSend }] }
-                    ],
-                    config: {
-                        systemInstruction: systemInstruction,
-                        temperature: 0.3,
-                    }
-                });
-
-                const assistantResponse = response.text || "Désolé, je n'ai pas pu formuler de réponse.";
-                setMessages(prev => [...prev, { role: 'assistant', content: assistantResponse, feedback: null }]);
-            } else {
-                // Intelligent Local RBAC Engine fallback if Gemini API is in local preview
-                let fallbackResponse = '';
-
-                if (isAskingTasks && canAccessTasks) {
-                    fallbackResponse = `Voici le récapitulatif des tâches autorisées pour votre session (${tasks.length} tâche(s) au total) :\n\n| Réf Dossier | Intitulé de la Tâche | Avocat / Responsable | Échéance | Statut |\n|---|---|---|---|---|\n` +
-                        tasks.map(t => `| **${t.caseId || 'Général'}** | ${t.name} | ${t.lawyer || 'Non assigné'} | ${t.dueDate || 'N/A'} | ${t.status} |`).join('\n') +
-                        `\n\n💡 *Tableau interactif : vous pouvez trier les colonnes, filtrer ou exporter les données.*`;
-                } else if (isAskingCases && canAccessCases) {
-                    fallbackResponse = `Voici l'état des dossiers auxquels vous avez accès (${cases.length} dossier(s)) :\n\n| Réf Dossier | Intitulé de l'Affaire | Client | Statut | Prochaine Audience |\n|---|---|---|---|---|\n` +
-                        cases.map(c => `| **${c.id}** | ${c.name} | ${c.client} | ${c.status} | ${c.nextHearing || 'Aucune'} |`).join('\n') +
-                        `\n\n💡 *Cliquez sur les en-têtes pour trier ou utilisez la recherche instantanée.*`;
-                } else if (isAskingClients && canAccessClients) {
-                    fallbackResponse = `Voici le répertoire des clients autorisés (${clients.length} client(s)) :\n\n| Référence | Nom du Client | Contact | Nombre de Dossiers |\n|---|---|---|---|\n` +
-                        clients.map(cl => `| **${cl.id}** | ${cl.name} | ${cl.contact} | ${cl.cases} dossier(s) |`).join('\n');
-                } else if (isAskingBilling && canAccessInvoices) {
-                    fallbackResponse = `Voici le suivi des factures et règlements (${invoices.length} facture(s)) :\n\n| Réf Facture | Dossier | Échéance | Montant Total | Montant Réglé | Reste Dû | Statut |\n|---|---|---|---|---|---|---|\n` +
-                        invoices.map(inv => {
-                            const due = inv.totalAmount - inv.paidAmount;
-                            return `| **${inv.id}** | ${inv.caseId} | ${inv.dueDate} | $${inv.totalAmount.toLocaleString()} | $${inv.paidAmount.toLocaleString()} | $${due.toLocaleString()} | ${inv.status} |`;
-                        }).join('\n');
-                } else {
-                    fallbackResponse = `Bonjour **${userName}** (Rôle : **${userRole}**).\n\nEn tant qu'assistant **Otshudi AI**, voici vos droits d'accès aux données du cabinet :\n- **Dossiers :** ${canAccessCases ? '✅ Accessible' : '🔒 Bloqué'}\n- **Tâches & Agenda :** ${canAccessTasks ? '✅ Accessible' : '🔒 Bloqué'}\n- **Clients :** ${canAccessClients ? '✅ Accessible' : '🔒 Bloqué'}\n- **Facturation & Finances :** ${canAccessInvoices ? '✅ Accessible' : '🔒 Bloqué'}\n\nVous pouvez me demander de générer un tableau des dossiers, des tâches urgentes ou des clients.`;
-                }
-
-                setMessages(prev => [...prev, { role: 'assistant', content: fallbackResponse, feedback: null }]);
-            }
+            const generateAIResponse = httpsCallable<
+                { prompt: string; history: Array<{ role: 'user' | 'model'; text: string }>; context: string },
+                { text: string }
+            >(functions, 'generateAIResponse');
+            const previousMessages = messages
+                .filter(message => message !== initialAssistantMessage)
+                .slice(-12)
+                .map(message => ({
+                    role: message.role === 'user' ? 'user' as const : 'model' as const,
+                    text: message.content
+                }));
+            const response = await generateAIResponse({
+                prompt: messageToSend,
+                history: previousMessages,
+                context: JSON.stringify(dataContextSummary)
+            });
+            setMessages(prev => [...prev, { role: 'assistant', content: response.data.text, feedback: null }]);
         } catch (error) {
             console.error("AI Error:", error);
             setErrorMessage("Erreur de communication avec le service d'intelligence artificielle.");

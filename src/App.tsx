@@ -25,8 +25,8 @@ import { MobileMenuModal, MobileTabBar } from './components/MobileMenuStyles';
 import { playAlarmSound, stopAllAlarmSounds } from './utils/audio';
 
 // Firebase core configuration
-import { db, auth, createAuthAccountIfPossible } from './firebase.ts';
-import { signInAnonymously, signOut } from 'firebase/auth';
+import { db, auth } from './firebase.ts';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 import { collection, onSnapshot, doc, setDoc, query, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { 
@@ -40,47 +40,27 @@ import { motion, AnimatePresence } from 'motion/react';
 import EmailComposerModal from './components/modals/EmailComposerModal';
 import { UserProfileModal } from './components/modals/UserProfileModal';
 import { ProtectedGuard } from './components/auth/ProtectedGuard';
-import { syncUsersWithFirestore, updateAppUser, createNewUser, syncAvocatsAndPersonnelsToUsers } from './services/userService';
-import { initializeAllFirestoreCollections } from './services/initCollectionsService';
+import { syncUsersWithFirestore, updateAppUser, createNewUser, syncAvocatsAndPersonnelsToUsers, getAuthenticatedUserByEmail } from './services/userService';
 import { AppUser, ModuleKey, PersonnelCategory } from './types/rbac';
-import { ALL_MODULE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from './services/rbacService';
+import { DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from './services/rbacService';
 import LoadingSpinner from './components/common/LoadingSpinner';
-import { safeSetItem, safeGetItem } from './utils/storageHelper';
+import { safeRemoveItem } from './utils/storageHelper';
 import { isActiveCase, isCaseForClient } from './utils/caseHelpers';
 
 declare const jspdf: any;
 
 const loadLocalCache = <T,>(key: string): T[] => {
-    try {
-        const stored = safeGetItem(key);
-        if (stored) {
-            const parsed = JSON.parse(stored);
-            if (Array.isArray(parsed)) return parsed;
-        }
-    } catch (e) {}
+    safeRemoveItem(key);
     return [];
 };
 
-const saveLocalCache = <T,>(key: string, data: T[]) => {
-    try {
-        if (Array.isArray(data)) {
-            // Trim bulky historical logs to protect browser storage quota
-            const toSave = key === 'kbb_cache_auditLogs' ? data.slice(-50) : data;
-            safeSetItem(key, JSON.stringify(toSave));
-        }
-    } catch (e) {}
+const saveLocalCache = <T,>(key: string, _data: T[]) => {
+    safeRemoveItem(key);
 };
 
 function App() {
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-        try { return sessionStorage.getItem('kbb_auth') === 'true'; } catch (e) { return false; }
-    });
-    const [currentUserInfo, setCurrentUserInfo] = useState<{ name: string; role: string; email: string; photoUrl?: string } | null>(() => {
-        try {
-            const stored = sessionStorage.getItem('kbb_currentUserInfo');
-            return stored ? JSON.parse(stored) : null;
-        } catch (e) { return null; }
-    });
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [currentUserInfo, setCurrentUserInfo] = useState<{ name: string; role: string; email: string; photoUrl?: string } | null>(null);
     const [currentUserObj, setCurrentUserObj] = useState<AppUser | null>(null);
     const [usersList, setUsersList] = useState<AppUser[]>([]);
     const [currentPage, setCurrentPage] = useState('Dashboard');
@@ -172,25 +152,72 @@ function App() {
         }
     };
 
-    // Persist login session to sessionStorage
     useEffect(() => {
-        if (!auth.currentUser) {
-            signInAnonymously(auth).catch(err => {
-                console.warn("Anonymous sign-in note:", err);
-            });
-        }
-        try {
-            sessionStorage.setItem('kbb_auth', String(isAuthenticated));
-            if (currentUserInfo) {
-                sessionStorage.setItem('kbb_currentUserInfo', JSON.stringify(currentUserInfo));
-            } else {
-                sessionStorage.removeItem('kbb_currentUserInfo');
-            }
-        } catch (e) {}
-    }, [isAuthenticated, currentUserInfo]);
+        [
+            'kbb_cache_clients', 'kbb_cache_cases', 'kbb_cache_events', 'kbb_cache_tasks',
+            'kbb_cache_invoices', 'kbb_cache_avocats', 'kbb_cache_personnels',
+            'kbb_cache_fournisseurs', 'kbb_cache_auditLogs', 'kbb_cache_correspondances',
+            'kbb_cache_users', 'kbb_ai_history'
+        ].forEach(safeRemoveItem);
 
-    // Real-time synchronization of users list and RBAC matrix
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            setIsDbConnected(true);
+            if (!firebaseUser) {
+                setIsAuthenticated(false);
+                setCurrentUserInfo(null);
+                setCurrentUserObj(null);
+                setIsInitialLoading(false);
+                return;
+            }
+
+            try {
+                const tokenResult = await firebaseUser.getIdTokenResult(true);
+                if (!firebaseUser.emailVerified || tokenResult.claims.appAccess !== true || tokenResult.claims.isDeleted === true) {
+                    await signOut(auth);
+                    setIsAuthenticated(false);
+                    setCurrentUserInfo(null);
+                    setCurrentUserObj(null);
+                    setIsInitialLoading(false);
+                    return;
+                }
+
+                const profile = await getAuthenticatedUserByEmail(firebaseUser.email || '');
+                if (!profile || profile.status !== 'Actif' || profile.isDeleted || profile.hasAppAccess === false) {
+                    await signOut(auth);
+                    setIsAuthenticated(false);
+                    setCurrentUserInfo(null);
+                    setCurrentUserObj(null);
+                    setIsInitialLoading(false);
+                    return;
+                }
+
+                setCurrentUserObj(profile);
+                setCurrentUserInfo({
+                    name: profile.fullName,
+                    role: profile.functionRole || profile.role,
+                    email: firebaseUser.email || '',
+                    photoUrl: profile.photoUrl || ''
+                });
+                setIsAuthenticated(true);
+            } catch (error) {
+                console.error('Unable to validate the authenticated user profile:', error);
+                await signOut(auth);
+                setIsAuthenticated(false);
+                setCurrentUserInfo(null);
+                setCurrentUserObj(null);
+            } finally {
+                setIsInitialLoading(false);
+            }
+        });
+
+        return unsubscribe;
+    }, []);
+
     useEffect(() => {
+        if (!isAuthenticated) {
+            setUsersList([]);
+            return;
+        }
         let unsub: (() => void) | undefined;
         syncUsersWithFirestore((latestUsers) => {
             setUsersList(latestUsers);
@@ -200,44 +227,19 @@ function App() {
         return () => {
             if (unsub) unsub();
         };
-    }, []);
+    }, [isAuthenticated]);
 
     useEffect(() => {
         if (currentUserInfo?.email) {
             const cleanEmail = (currentUserInfo.email || '').trim().toLowerCase();
             const found = usersList.find(u => (u.email || '').trim().toLowerCase() === cleanEmail);
-            const isSuperAdminEmail = cleanEmail === 'jeremieshusu4@gmail.com' ||
-                cleanEmail === 'hervemich@icloud.com' ||
-                cleanEmail === 'patbonles@gmail.com' ||
-                cleanEmail === 'admin@cabinet.com';
-
             if (found) {
                 if (found.photoUrl && currentUserInfo.photoUrl !== found.photoUrl) {
                     setCurrentUserInfo(prev => prev ? { ...prev, photoUrl: found.photoUrl, name: found.fullName || prev.name } : null);
                 }
-                if (isSuperAdminEmail || found.role === 'Admin') {
-                    setCurrentUserObj({
-                        ...found,
-                        role: 'Admin',
-                        permissions: ALL_MODULE_PERMISSIONS.map(m => m.key)
-                    });
-                } else {
-                    setCurrentUserObj(found);
-                }
-            } else if (isSuperAdminEmail || currentUserInfo.role === 'Admin') {
-                setCurrentUserObj({
-                    id: 'admin-default',
-                    email: currentUserInfo.email,
-                    fullName: currentUserInfo.name,
-                    photoUrl: currentUserInfo.photoUrl,
-                    role: 'Admin',
-                    personnelCategory: 'Administratif',
-                    hasAppAccess: true,
-                    permissions: ALL_MODULE_PERMISSIONS.map(m => m.key),
-                    createdAt: new Date().toISOString(),
-                    isDeleted: false,
-                    status: 'Actif'
-                });
+                setCurrentUserObj(found);
+            } else {
+                setCurrentUserObj(null);
             }
         } else {
             setCurrentUserObj(null);
@@ -452,28 +454,7 @@ function App() {
         });
     }, [clients, avocats, personnels, fournisseurs]);
 
-    // 1. Establish Firebase Anonymous Authenticaton
-    useEffect(() => {
-        const initAuth = async () => {
-            try {
-                const cred = await signInAnonymously(auth);
-                console.log("Firebase secure anonymous auth success:", cred.user.uid);
-                setIsDbConnected(true);
-                triggerToast('success', 'Synchronisation réussie avec la base kbb !');
-                initializeAllFirestoreCollections();
-            } catch (err) {
-                console.warn("Could not authenticate anonymously on startup:", err);
-                setIsDbConnected(true); // fall back to offline storage while trying queries
-                triggerToast('success', 'Base kbb initialisée !');
-                initializeAllFirestoreCollections();
-            } finally {
-                setTimeout(() => setIsInitialLoading(false), 500);
-            }
-        };
-        initAuth();
-    }, []);
-
-    // 2. Complete connection and enable real-time Firestore listeners for authenticated sessions
+    // Load Firestore collections only after Firebase Auth validates the user.
     useEffect(() => {
         if (!isDbConnected || !isAuthenticated) return;
 
@@ -966,110 +947,29 @@ function App() {
 
     const lawyerNames = avocats.map((a) => a.fullName);
 
-    const handleLoginSuccess = (email: string) => {
+    const handleLoginSuccess = (user: AppUser) => {
         setIsAuthenticated(true);
-        const cleanEmail = (email || '').trim().toLowerCase();
-        
-        // Reset forceLogout flag and mark online in Firestore for this user
-        const userInDb = usersList.find(u => u.email && u.email.trim().toLowerCase() === cleanEmail);
-        if (userInDb) {
-            updateAppUser(userInDb.id, {
-                isOnline: true,
-                forceLogout: false,
-                lastActiveAt: new Date().toISOString()
-            }).catch(() => {});
-        }
-
-        // 1. Check user from usersList (defined during creation in management)
-        const foundInUsers = usersList.find(u => (u.email || '').trim().toLowerCase() === cleanEmail);
-        if (foundInUsers) {
-            const userInfo = {
-                name: foundInUsers.fullName,
-                role: foundInUsers.functionRole || foundInUsers.role || 'Collaborateur',
-                email: cleanEmail,
-                photoUrl: foundInUsers.photoUrl || ''
-            };
-            setCurrentUserInfo(userInfo);
-            const prefix = foundInUsers.userType === 'Avocat' ? 'Maître ' : '';
-            triggerToast('success', `Ravi de vous revoir, ${prefix}${foundInUsers.fullName} !`);
-            dbCreateAuditLog({
-                userEmail: userInfo.email,
-                userName: userInfo.name,
-                actionType: 'Connexion',
-                module: 'Authentification',
-                description: `Connexion de ${prefix}${userInfo.name} (${userInfo.role})`
-            });
-            return;
-        }
-
-        // 2. Search in avocats
-        const foundAvocat = avocats.find(a => 
-            a.emails && a.emails.some(e => (e || '').trim().toLowerCase() === cleanEmail)
-        );
-        if (foundAvocat) {
-            const userInfo = {
-                name: foundAvocat.fullName,
-                role: foundAvocat.cabinetRole || foundAvocat.cabinetStatus || "Avocat",
-                email: cleanEmail,
-                photoUrl: foundAvocat.photoUrl || ''
-            };
-            setCurrentUserInfo(userInfo);
-            triggerToast('success', `Ravi de vous revoir, Maître ${foundAvocat.fullName} !`);
-            dbCreateAuditLog({
-                userEmail: userInfo.email,
-                userName: userInfo.name,
-                actionType: 'Connexion',
-                module: 'Authentification',
-                description: `Connexion de Maître ${userInfo.name} (${userInfo.role})`
-            });
-            return;
-        }
-
-        // 3. Search in personnels
-        const foundPersonnel = personnels.find(p => 
-            p.email && (p.email || '').trim().toLowerCase() === cleanEmail
-        );
-        if (foundPersonnel) {
-            const userInfo = {
-                name: foundPersonnel.fullName,
-                role: foundPersonnel.role,
-                email: cleanEmail,
-                photoUrl: foundPersonnel.photoUrl || ''
-            };
-            setCurrentUserInfo(userInfo);
-            triggerToast('success', `Ravi de vous revoir, ${foundPersonnel.fullName} !`);
-            dbCreateAuditLog({
-                userEmail: userInfo.email,
-                userName: userInfo.name,
-                actionType: 'Connexion',
-                module: 'Authentification',
-                description: `Connexion de ${userInfo.name} (${userInfo.role})`
-            });
-            return;
-        }
-
-        // 4. Default admin account
-        const adminName = cleanEmail === 'jeremieshusu4@gmail.com' 
-            ? "Jérémie Shusu" 
-            : cleanEmail === 'hervemich@icloud.com' 
-                ? "Herve Mich" 
-                : cleanEmail === 'patbonles@gmail.com'
-                    ? "Pat Bonles"
-                    : "Administrateur Cabinet";
-        const adminInfo = {
-            name: adminName,
-            role: "Directeur Associé KBB",
-            email: cleanEmail,
-            photoUrl: ''
+        setCurrentUserObj(user);
+        const email = user.email.trim().toLowerCase();
+        const userInfo = {
+            name: user.fullName,
+            role: user.functionRole || user.role,
+            email,
+            photoUrl: user.photoUrl || ''
         };
-        setCurrentUserInfo(adminInfo);
-        triggerToast('success', `Connexion de l'administrateur ${adminName} réussie !`);
+        setCurrentUserInfo(userInfo);
+        updateAppUser(user.id, {
+            isOnline: true,
+            lastActiveAt: new Date().toISOString()
+        }).catch(err => console.error('Unable to update user presence:', err));
+        const prefix = user.userType === 'Avocat' ? 'Maître ' : '';
+        triggerToast('success', `Ravi de vous revoir, ${prefix}${user.fullName} !`);
         dbCreateAuditLog({
-            userEmail: adminInfo.email,
-            userName: adminInfo.name,
+            userEmail: userInfo.email,
+            userName: userInfo.name,
             actionType: 'Connexion',
             module: 'Authentification',
-            description: `Connexion de l'administrateur du cabinet (${adminInfo.name})`
+            description: `Connexion de ${prefix}${userInfo.name} (${userInfo.role})`
         });
     };
 
@@ -1096,7 +996,9 @@ function App() {
         }
         setIsAuthenticated(false);
         setCurrentUserInfo(null);
+        setCurrentUserObj(null);
         setCurrentPage('Dashboard');
+        signOut(auth).catch(err => console.error('Unable to sign out from Firebase:', err));
     };
 
     const logActivity = async (
@@ -1297,7 +1199,7 @@ function App() {
 
     const handleAddAvocat = async (newAvocat: Avocat, password?: string) => {
         const email = (newAvocat.emails && newAvocat.emails[0]) ? newAvocat.emails[0].trim().toLowerCase() : '';
-        const cleanPassword = (password || 'Cabinet2025!').trim();
+        const cleanPassword = (password || '').trim();
 
         if (!email) {
             triggerToast('error', "L'adresse e-mail principale est requise pour enregistrer un avocat.");
@@ -1316,23 +1218,17 @@ function App() {
                     phone: newAvocat.phone || '',
                     permissions: DEFAULT_ROLE_PERMISSIONS.Avocat,
                     linkedEntityId: newAvocat.id,
-                    password: cleanPassword,
-                    tempPassword: cleanPassword
+                    password: cleanPassword
                 });
             } else {
                 await updateAppUser(existingUser.id, {
                     fullName: newAvocat.fullName,
-                    password: cleanPassword,
-                    tempPassword: cleanPassword,
                     linkedEntityId: newAvocat.id
                 });
             }
         } catch (uErr) {
             console.warn("Could not save avocat to users collection:", uErr);
         }
-
-        // 2. Ensure Firebase Auth account exists
-        await createAuthAccountIfPossible(email, cleanPassword);
 
         setAvocats(prev => [...prev, newAvocat]);
         try {
@@ -1348,7 +1244,7 @@ function App() {
 
     const handleAddPersonnel = async (newPersonnel: Personnel, password?: string) => {
         const email = newPersonnel.email ? newPersonnel.email.trim().toLowerCase() : '';
-        const cleanPassword = (password || 'Cabinet2025!').trim();
+        const cleanPassword = (password || '').trim();
         const isOfficePersonnel = newPersonnel.category === 'Office';
 
         if (email) {
@@ -1365,14 +1261,11 @@ function App() {
                         hasAppAccess: !isOfficePersonnel,
                         permissions: !isOfficePersonnel ? DEFAULT_ROLE_PERMISSIONS.Personnel : [],
                         linkedEntityId: newPersonnel.id,
-                        password: cleanPassword,
-                        tempPassword: cleanPassword
+                        password: isOfficePersonnel ? undefined : cleanPassword
                     });
                 } else {
                     await updateAppUser(existingUser.id, {
                         fullName: newPersonnel.fullName,
-                        password: cleanPassword,
-                        tempPassword: cleanPassword,
                         linkedEntityId: newPersonnel.id
                     });
                 }
@@ -1380,9 +1273,6 @@ function App() {
                 console.warn("Could not save personnel to users collection:", uErr);
             }
 
-            if (!isOfficePersonnel) {
-                await createAuthAccountIfPossible(email, cleanPassword);
-            }
         }
 
         setPersonnels(prev => [...prev, newPersonnel]);
@@ -2041,13 +1931,6 @@ function App() {
                 onUpdateSuccess={(newName, newPhotoUrl) => {
                     setCurrentUserInfo(prev => prev ? { ...prev, name: newName, photoUrl: newPhotoUrl } : null);
                     setCurrentUserObj(prev => prev ? { ...prev, fullName: newName, photoUrl: newPhotoUrl } : null);
-                    try {
-                        const stored = sessionStorage.getItem('kbb_currentUserInfo');
-                        if (stored) {
-                            const parsed = JSON.parse(stored);
-                            sessionStorage.setItem('kbb_currentUserInfo', JSON.stringify({ ...parsed, name: newName, photoUrl: newPhotoUrl }));
-                        }
-                    } catch (e) {}
                 }}
                 onAddToast={triggerToast}
             />
