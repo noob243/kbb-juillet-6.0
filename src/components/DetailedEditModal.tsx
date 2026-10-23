@@ -158,20 +158,17 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
     
     if (type === 'event') {
       const updatedEvent: Event = { ...formData };
-      if (updatedEvent.evolutionFinancement) {
-        const totalAttendu = updatedEvent.evolutionFinancement.reduce((total, funding) => total + (Number(funding.attendu) || 0), 0);
-        const totalRealise = updatedEvent.evolutionFinancement.reduce((total, funding) => total + (Number(funding.realise) || 0), 0);
-        updatedEvent.budgetPrevisionnel = String(totalAttendu);
-        updatedEvent.budgetRealise = String(totalRealise);
-        updatedEvent.recettesTotal = totalRealise;
-        updatedEvent.financement = updatedEvent.evolutionFinancement
-          .map(funding => `${funding.designation} (Attendu: $${funding.attendu}, Réalisé: $${funding.realise})`)
-          .join(', ');
-        updatedEvent.financements = updatedEvent.evolutionFinancement.map(funding => ({
-          label: funding.designation,
-          amount: String(funding.realise)
-        }));
-      }
+      updatedEvent.evolutionFinancement = eventFundingRows;
+      updatedEvent.budgetPrevisionnel = String(eventTotalAttendu);
+      updatedEvent.budgetRealise = String(eventTotalRealise);
+      updatedEvent.recettesTotal = eventTotalRealise;
+      updatedEvent.financement = eventFundingRows
+        .map(funding => `${funding.designation} (Attendu: $${funding.attendu}, Réalisé: $${funding.realise})`)
+        .join(', ');
+      updatedEvent.financements = eventFundingRows.map(funding => ({
+        label: funding.designation,
+        amount: String(funding.realise)
+      }));
       onSave(updatedEvent);
       return;
     }
@@ -202,10 +199,10 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
     }
   };
 
-  const eventFundingRows = formData.evolutionFinancement || [
+  const eventFundingRows: NonNullable<Event['evolutionFinancement']> = formData.evolutionFinancement || [
     {
       designation: 'Cabinet KBB',
-      attendu: 0,
+      attendu: Number(formData.budgetPrevisionnel) || 0,
       realise: Number(formData.financements?.find((funding: any) => ['Cabinet KBB', 'KBB'].includes(funding.label))?.amount) || 0
     },
     {
@@ -220,6 +217,8 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
       realise: Number(formData.autresRecettes) || Number(formData.financements?.find((funding: any) => ['Autre', 'Autres'].includes(funding.label))?.amount) || 0
     }
   ];
+  const eventTotalAttendu = eventFundingRows.reduce((total, funding) => total + (Number(funding.attendu) || 0), 0);
+  const eventTotalRealise = eventFundingRows.reduce((total, funding) => total + (Number(funding.realise) || 0), 0);
   const eventReports: EventReport[] = formData.reports || [];
 
   const updateEventFunding = (index: number, field: 'designation' | 'attendu' | 'realise', value: string) => {
@@ -1672,22 +1671,23 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
                 )}
               </div>
               <div className="grid grid-cols-2 gap-2">
+                <p className="col-span-2 text-[10px] font-semibold text-gray-500">Totaux calculés automatiquement à partir des lignes de financement.</p>
                 <div>
                   <label className="block text-[10px] font-extrabold uppercase tracking-wide text-gray-500 mb-1">Budget Prévisionnel ($)</label>
                   <input 
                     type="text" 
-                    value={formData.budgetPrevisionnel || ''} 
-                    onChange={(e) => handleFieldChange('budgetPrevisionnel', e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15"
+                    value={eventTotalAttendu}
+                    readOnly
+                    className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold bg-slate-50"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-extrabold uppercase tracking-wide text-gray-500 mb-1">Budget Réalisé ($)</label>
                   <input 
                     type="text" 
-                    value={formData.budgetRealise || ''} 
-                    onChange={(e) => handleFieldChange('budgetRealise', e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-indigo-500/15"
+                    value={eventTotalRealise}
+                    readOnly
+                    className="w-full p-2 border border-slate-300 rounded-xl text-xs font-semibold bg-slate-50"
                   />
                 </div>
               </div>
