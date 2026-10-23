@@ -36,6 +36,7 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
   // Personal Info Form State
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [functionRole, setFunctionRole] = useState('');
   const [email, setEmail] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
 
@@ -55,6 +56,7 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
     if (isOpen) {
       setFullName(currentUserObj?.fullName || currentUserInfo?.name || '');
       setPhone(currentUserObj?.phone || '');
+      setFunctionRole(currentUserObj?.functionRole || '');
       setEmail(currentUserObj?.email || currentUserInfo?.email || '');
       setPhotoUrl(currentUserObj?.photoUrl || currentUserInfo?.photoUrl || '');
       setCurrentPassword('');
@@ -122,6 +124,7 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
       await updateAppUser(targetUserId, {
         fullName: fullName.trim(),
         phone: phone.trim(),
+        functionRole: functionRole.trim(),
         photoUrl: photoUrl
       });
 
@@ -486,9 +489,13 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
                     <label className="block text-2xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                       Titre / Fonction au Cabinet
                     </label>
-                    <p className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-sm font-semibold text-slate-600 dark:text-slate-300">
-                      {currentUserObj?.functionRole || 'Non renseigné'}
-                    </p>
+                    <input
+                      type="text"
+                      value={functionRole}
+                      onChange={(e) => setFunctionRole(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-semibold text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition"
+                      placeholder="Ex: Avocat Associé"
+                    />
                   </div>
                 </div>
 

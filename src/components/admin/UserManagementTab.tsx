@@ -3,6 +3,7 @@ import { AppUser, CreateUserPayload, FunctionRole, ModuleKey, PersonnelCategory,
 import { Avocat, Personnel } from '../../types';
 import { ALL_MODULE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from '../../services/rbacService';
 import { createNewUser, restoreUser, softDeleteUser, updateAppUser } from '../../services/userService';
+import { createAuthAccountIfPossible } from '../../firebase';
 import { PermissionMatrix } from './PermissionMatrix';
 import { dbCreateDoc, sanitizeForFirestore } from '../../lib/firestoreService';
 import { FormField, FormInput, FormSelect } from '../common/FormControls';
@@ -48,8 +49,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
   const [createPhone, setCreatePhone] = useState('');
   const [createFunctionRole, setCreateFunctionRole] = useState<FunctionRole | string>('Senior');
   const [createPermissions, setCreatePermissions] = useState<ModuleKey[]>(DEFAULT_ROLE_PERMISSIONS.Avocat);
-  const [createTempPassword, setCreateTempPassword] = useState(() => crypto.randomUUID());
-  const [showCreateTempPassword, setShowCreateTempPassword] = useState(false);
+  const [createTempPassword, setCreateTempPassword] = useState('Cabinet2025!');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- AVOCAT & PERSONNEL CREATION FIELDS ---
@@ -84,6 +84,8 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
   const [editFunctionRole, setEditFunctionRole] = useState<string>('Senior');
   const [editPermissions, setEditPermissions] = useState<ModuleKey[]>([]);
   const [editStatus, setEditStatus] = useState<'Actif' | 'Inactif' | 'Archivé'>('Actif');
+  const [editPassword, setEditPassword] = useState('');
+  const [showEditPassword, setShowEditPassword] = useState(false);
   const [searchEditQuery, setSearchEditQuery] = useState('');
 
   // Handle bar checkbox toggles
@@ -99,7 +101,6 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
     if (type === 'Avocat') {
       setCreateFunctionRole('Senior');
       setCreatePermissions(DEFAULT_ROLE_PERMISSIONS.Avocat);
-      setCreateTempPassword(crypto.randomUUID());
     } else {
       setCreateCategory('Administratif');
       setCreateFunctionRole('Secrétaire');
@@ -260,8 +261,6 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
       setCreatePersonnelDisciplinaryMeasure('');
       setCreateBankAccounts([]);
       setCreatePermissions(DEFAULT_ROLE_PERMISSIONS.Avocat);
-      setCreateTempPassword(crypto.randomUUID());
-      setShowCreateTempPassword(false);
       onRefreshUsers();
     } catch (err: any) {
       console.error("Failed to create user:", err);
@@ -283,6 +282,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
     setEditFunctionRole(user.functionRole);
     setEditPermissions(user.permissions || []);
     setEditStatus(user.status || 'Actif');
+    setEditPassword(user.password || user.tempPassword || 'Cabinet2025!');
   };
 
   const handleEditSave = async (e: React.FormEvent) => {
@@ -290,6 +290,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
     if (!editingUserId) return;
 
     try {
+      const cleanPassword = editPassword.trim() || 'Cabinet2025!';
       const isDeleteGranted = editRole === 'Admin' || editPermissions.includes('can_delete');
       await updateAppUser(editingUserId, {
         fullName: editFullName,
@@ -301,10 +302,17 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
         functionRole: editFunctionRole,
         permissions: editUserType === 'Personnel' && editCategory === 'Office' ? [] : editPermissions,
         canDelete: isDeleteGranted,
-        status: editStatus
+        status: editStatus,
+        password: cleanPassword,
+        tempPassword: cleanPassword
       });
 
-      onAddToast('success', 'Profil et autorisations mis à jour avec succès.');
+      // Synchronize with Firebase Auth account
+      if (editEmail && cleanPassword) {
+        await createAuthAccountIfPossible(editEmail.trim(), cleanPassword);
+      }
+
+      onAddToast('success', 'Profil, mot de passe et autorisations mis à jour avec succès.');
       setEditingUserId(null);
       onRefreshUsers();
     } catch (err: any) {
@@ -579,24 +587,12 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
               />
             </FormField>
 
-            <FormField label="Mot de passe temporaire (12 caractères minimum)">
-              <div className="flex gap-2">
-                <FormInput
-                  type={showCreateTempPassword ? 'text' : 'password'}
-                  value={createTempPassword}
-                  onChange={e => setCreateTempPassword(e.target.value)}
-                  minLength={12}
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCreateTempPassword(value => !value)}
-                  className="px-3 border border-gray-300 rounded-lg text-xs font-semibold"
-                  aria-label={showCreateTempPassword ? 'Masquer le mot de passe temporaire' : 'Afficher le mot de passe temporaire'}
-                >
-                  {showCreateTempPassword ? 'Masquer' : 'Afficher'}
-                </button>
-              </div>
+            <FormField label="Mot de passe temporaire">
+              <FormInput
+                type="text"
+                value={createTempPassword}
+                onChange={e => setCreateTempPassword(e.target.value)}
+              />
             </FormField>
           </div>
 
@@ -1344,9 +1340,29 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                     </div>
                   </div>
 
+                  {/* Password Modification */}
                   <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <p className="text-[10px] text-slate-600 dark:text-slate-300">
-                      Les mots de passe sont gérés exclusivement par Firebase Authentication. L’utilisateur peut les réinitialiser depuis l’écran de connexion.
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                        Mot de Passe de Connexion
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowEditPassword(!showEditPassword)}
+                        className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
+                      >
+                        {showEditPassword ? 'Masquer' : 'Afficher'}
+                      </button>
+                    </div>
+                    <input
+                      type={showEditPassword ? 'text' : 'password'}
+                      value={editPassword}
+                      onChange={e => setEditPassword(e.target.value)}
+                      placeholder="Définir un nouveau mot de passe"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-medium font-mono"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Ce mot de passe permettra à l'utilisateur de se connecter immédiatement à l'application.
                     </p>
                   </div>
 

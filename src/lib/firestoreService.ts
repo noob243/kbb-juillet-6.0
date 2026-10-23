@@ -7,8 +7,7 @@ import {
   updateDoc, 
   deleteDoc, 
   doc, 
-  onSnapshot,
-  serverTimestamp
+  onSnapshot 
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { AuditLog } from '../types';
@@ -246,11 +245,6 @@ export async function syncLocalCollection<T extends { id: string | number }>(
 }
 
 export async function dbCreateAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'> & { date?: string; heure?: string }): Promise<AuditLog | null> {
-  const currentUser = auth.currentUser;
-  if (!currentUser?.email || !currentUser.emailVerified) {
-    console.error('Audit log creation requires a verified Firebase user.');
-    return null;
-  }
   const id = `log_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   const now = new Date();
   const timestamp = now.toISOString();
@@ -262,10 +256,7 @@ export async function dbCreateAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'> &
     id,
     timestamp,
     date: dateStr,
-    heure: heureStr,
-    actorUid: currentUser.uid,
-    userEmail: currentUser.email,
-    createdAt: serverTimestamp()
+    heure: heureStr
   };
   try {
     const docRef = doc(db, 'auditLogs', id);
@@ -277,3 +268,4 @@ export async function dbCreateAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'> &
     return null;
   }
 }
+

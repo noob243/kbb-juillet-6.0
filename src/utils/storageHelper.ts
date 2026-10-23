@@ -4,6 +4,8 @@
  * and prunes non-critical caches if browser quota is exhausted.
  */
 
+import { AppUser } from '../types/rbac';
+
 // Non-critical cache keys that can safely be evicted if storage is full
 const LOW_PRIORITY_CACHE_KEYS = [
   'kbb_cache_auditLogs',
@@ -11,6 +13,25 @@ const LOW_PRIORITY_CACHE_KEYS = [
   'kbb_cache_events',
   'kbb_cache_tasks'
 ];
+
+/**
+ * Strips huge base64 strings or payloads from users before saving to localStorage
+ */
+export function sanitizeUsersForStorage(users: AppUser[]): AppUser[] {
+  if (!Array.isArray(users)) return [];
+  return users.map(user => {
+    // If photoUrl is a massive base64 string (> 1000 chars), omit or placeholder it in cache
+    let safePhotoUrl = user.photoUrl;
+    if (safePhotoUrl && safePhotoUrl.startsWith('data:') && safePhotoUrl.length > 1000) {
+      safePhotoUrl = undefined; // Don't bloat local cache with raw base64; will load from Firestore/session
+    }
+
+    return {
+      ...user,
+      photoUrl: safePhotoUrl
+    };
+  });
+}
 
 /**
  * Safely sets an item in localStorage with quota recovery

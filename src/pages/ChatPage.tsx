@@ -1,6 +1,6 @@
 import React, { FC, useState, useEffect, useMemo, useRef } from 'react';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { db } from '../firebase';
 import { ChatIcon } from '../components/Icons';
 import { AppUser } from '../types/rbac';
 import { ArrowLeft, Send, Search, CheckCheck, Clock, Users, Building2, MessageSquare } from 'lucide-react';
@@ -9,7 +9,6 @@ import PaginationControls from '../components/common/PaginationControls';
 
 export interface ForumReply {
     id: number;
-    authorUid?: string;
     author: string;
     role: string;
     text: string;
@@ -19,7 +18,6 @@ export interface ForumReply {
 
 export interface ForumTopic {
     id: number;
-    authorUid?: string;
     title: string;
     category: 'Jurisprudence' | 'Administration' | 'Entraide' | 'Général';
     author: string;
@@ -46,7 +44,41 @@ interface ChatPageProps {
     presences: { [email: string]: any };
 }
 
+const defaultAdminsList = [
+    { email: 'admin@cabinet.com', name: 'Administrateur Cabinet', role: 'Directeur Associé KBB' },
+    { email: 'jeremieshusu4@gmail.com', name: 'Jérémie Shusu', role: 'Admin Principal' },
+    { email: 'hervemich@icloud.com', name: 'Hervé Mich', role: 'Admin Principal' }
+];
+
 const initialDefaultTopics: ForumTopic[] = [
+    {
+        id: 1,
+        title: "Nouvelle jurisprudence sur les licenciements collectifs",
+        category: "Jurisprudence",
+        author: "Jean-Luc Tshisekedi",
+        role: "Avocat Associé",
+        date: "28 Mai 2026, 10:15",
+        content: "Chers confrères, avez-vous pris connaissance du dernier arrêt de la Cour de Cassation concernant les nouveaux barèmes d'indemnisation ? Cela pourrait impacter durablement notre dossier de défense pour Congo Invest SARL.",
+        replies: [
+            {
+                id: 101,
+                author: "Marie-Claire Mobutu",
+                role: "Avocate Collaboratrice",
+                text: "Oui, Jean-Luc. J'allais justement t'en parler. Cet arrêt clarifie que le barème ne s'applique pas en cas de violation caractérisée d'un droit fondamental.",
+                time: "Aujourd'hui à 11:30"
+            }
+        ]
+    },
+    {
+        id: 2,
+        title: "Projets de numérisation complète du Tribunal de Grande Instance (TGI)",
+        category: "Administration",
+        author: "Félicité Kanku",
+        role: "Secrétaire Juridique",
+        date: "27 Mai 2026, 09:12",
+        content: "Bonjour à tous, le secrétariat du greffe a annoncé que le TGI va mettre en route sa nouvelle plateforme d'envoi d'actes dématérialisés dès le mois prochain.",
+        replies: []
+    }
 ];
 
 const GENERAL_CHANNEL: ChatContact = {
@@ -84,8 +116,8 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
     const [forumSearchTerm, setForumSearchTerm] = useState('');
     const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('Tous');
     const [isCreatingTopic, setIsCreatingTopic] = useState(false);
-    const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
-    const [forumTopics, setForumTopics] = useState<ForumTopic[]>([]);
+    const [selectedTopicId, setSelectedTopicId] = useState<number | null>(1);
+    const [forumTopics, setForumTopics] = useState<ForumTopic[]>(initialDefaultTopics);
 
     // Create Topic Form State
     const [newTopicTitle, setNewTopicTitle] = useState('');
@@ -114,6 +146,19 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
                 }
             });
         }
+
+        // 2. Add default admins
+        defaultAdminsList.forEach(admin => {
+            const cleanEmail = admin.email.toLowerCase().trim();
+            if (!usersMap.has(cleanEmail)) {
+                usersMap.set(cleanEmail, {
+                    name: admin.name,
+                    role: admin.role,
+                    email: cleanEmail,
+                    status: 'offline'
+                });
+            }
+        });
 
         // 3. Add avocats
         if (avocats && Array.isArray(avocats)) {
@@ -173,6 +218,23 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
             msgs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
             setAllRawMessages(msgs);
 
+            // Seed initial welcoming messages in general channel if completely empty
+            const generalMsgs = msgs.filter(m => m.channel === 'general' || m.recipientEmail === 'general@cabinet.com');
+            if (generalMsgs.length === 0) {
+                const welcomeMsg = {
+                    id: `msg_welcome_${Date.now()}`,
+                    senderEmail: 'admin@cabinet.com',
+                    senderName: 'Directeur Associé KBB',
+                    senderRole: 'Direction du Cabinet',
+                    recipientEmail: 'general@cabinet.com',
+                    recipientName: 'Chat Cabinet',
+                    channel: 'general',
+                    text: 'Bienvenue sur le Chat Cabinet KBB ! Utilisez cet espace pour échanger en direct avec tous vos confrères et collaborateurs.',
+                    timestamp: Date.now() - 3600000,
+                    time: '10:00'
+                };
+                setDoc(doc(db, 'chat_messages', welcomeMsg.id), welcomeMsg).catch(() => {});
+            }
         }, (err) => {
             console.warn("Direct Messages subscription notice:", err?.message);
         });
@@ -183,7 +245,14 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
     useEffect(() => {
         const unsub = onSnapshot(collection(db, 'forum_topics'), (snapshot) => {
             if (snapshot.empty) {
-                setForumTopics([]);
+                // Seed initial topics if empty
+                initialDefaultTopics.forEach(async (topic) => {
+                    try {
+                        await setDoc(doc(db, 'forum_topics', String(topic.id)), topic);
+                    } catch (e) {
+                        console.warn("Failed seeding forum topic:", e);
+                    }
+                });
             } else {
                 const topics: ForumTopic[] = [];
                 snapshot.forEach((docSnap) => {
@@ -266,7 +335,7 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
 
     // Send a message (General or Direct)
     const sendMessageText = async (textToSend: string) => {
-        if (!auth.currentUser || !textToSend.trim() || !selectedContact) return;
+        if (!textToSend.trim() || !selectedContact) return;
         setIsSending(true);
 
         const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -274,7 +343,6 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
 
         const newMsgDoc = {
             id: msgId,
-            senderUid: auth.currentUser.uid,
             senderEmail: myEmail || 'cabinet@kbb.cd',
             senderName: myName,
             senderRole: myRole,
@@ -308,7 +376,7 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
     // Post reply on forum
     const handlePostReply = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!auth.currentUser || newReplyText.trim() === '' || selectedTopicId === null) return;
+        if (newReplyText.trim() === '' || selectedTopicId === null) return;
 
         const replyText = newReplyText.trim();
         setNewReplyText('');
@@ -318,7 +386,6 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
 
         const newReply: ForumReply = {
             id: Date.now(),
-            authorUid: auth.currentUser.uid,
             author: myName,
             role: myRole,
             text: replyText,
@@ -345,12 +412,11 @@ const ChatPage: FC<ChatPageProps> = ({ users = [], avocats = [], personnels = []
     // Create topic action
     const handleCreateTopic = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!auth.currentUser || newTopicTitle.trim() === '' || newTopicContent.trim() === '') return;
+        if (newTopicTitle.trim() === '' || newTopicContent.trim() === '') return;
 
         const topicId = Date.now();
         const newTopic: ForumTopic = {
             id: topicId,
-            authorUid: auth.currentUser.uid,
             title: newTopicTitle.trim(),
             category: newTopicCategory,
             author: myName,

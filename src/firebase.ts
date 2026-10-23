@@ -1,7 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import { getFunctions } from 'firebase/functions';
 import firebaseConfigJson from '../firebase-applet-config.json';
 
 const config = (firebaseConfigJson as any) || {};
@@ -22,7 +21,6 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const db = getFirestore(app, targetDatabaseId);
 export const auth = getAuth(app);
-export const functions = getFunctions(app);
 export const googleAuthProvider = new GoogleAuthProvider();
 
 let secondaryAuthInstance: ReturnType<typeof getAuth> | null = null;
@@ -36,11 +34,10 @@ export function getSecondaryAuth() {
 }
 
 export async function createAuthAccountIfPossible(email: string, password?: string): Promise<{ success: boolean; error?: string }> {
-  if (!email || !password || password.length < 12) return { success: false, error: 'Le mot de passe doit contenir au moins 12 caractères.' };
+  if (!email || !password || password.length < 6) return { success: false, error: 'Mot de passe invalide (6 caractères minimum)' };
   try {
     const secAuth = getSecondaryAuth();
-    const credential = await createUserWithEmailAndPassword(secAuth, email.trim(), password);
-    await sendEmailVerification(credential.user);
+    await createUserWithEmailAndPassword(secAuth, email.trim(), password);
     await signOut(secAuth);
     return { success: true };
   } catch (err: any) {
@@ -51,5 +48,7 @@ export async function createAuthAccountIfPossible(email: string, password?: stri
   }
 }
 
-export { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, signInWithPopup };
+export { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, signInWithPopup };
+
+
 

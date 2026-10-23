@@ -423,11 +423,11 @@ export async function exportListToPdf(
             Cabinet d'Avocats
           </div>
           <div style="font-size: 10px; color: #64748b; margin-top: 4px;">
-            Exporté le : ${escapeHtml(exportDate)} | Total enregistrements : <strong>${rows.length}</strong>
+            Exporté le : ${exportDate} | Total enregistrements : <strong>${rows.length}</strong>
           </div>
         </div>
         <div style="background-color: #15447c; color: #ffffff; padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 800;">
-          ${escapeHtml(titleText)}
+          ${titleText}
         </div>
       </div>
 
@@ -438,7 +438,7 @@ export async function exportListToPdf(
             <tr style="background-color: #15447c; color: #ffffff; text-align: left;">
               ${columns.map(col => `
                 <th style="padding: 8px 10px; font-weight: 800; text-transform: uppercase; border-bottom: 2px solid #0f3460;">
-                  ${escapeHtml(col)}
+                  ${col}
                 </th>
               `).join('')}
             </tr>
@@ -448,7 +448,7 @@ export async function exportListToPdf(
               <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}; border-bottom: 1px solid #e2e8f0;">
                 ${row.map(cell => `
                   <td style="padding: 8px 10px; font-weight: 600; color: #334155;">
-                    ${escapeHtml(cell !== undefined && cell !== null ? cell : '-')}
+                    ${cell !== undefined && cell !== null ? String(cell) : '-'}
                   </td>
                 `).join('')}
               </tr>

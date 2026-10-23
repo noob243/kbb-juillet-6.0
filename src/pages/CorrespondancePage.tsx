@@ -25,12 +25,6 @@ interface CorrespondancePageProps {
 }
 
 const initialCorrespondances: Correspondance[] = [];
-const escapeHtml = (value: unknown): string => String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 
 export const CorrespondancePage: FC<CorrespondancePageProps> = ({ 
     clients, 
@@ -127,8 +121,18 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
                 setCorrespondances(initialCorrespondances);
             }
         }, (err) => {
-            console.error("Correspondances subscription failed:", err);
-            setCorrespondances([]);
+            console.warn("Correspondances subscription notice (Quota/Offline): falling back to local cache", err);
+            try {
+                const cached = localStorage.getItem('kbb_cache_correspondances');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setCorrespondances(parsed);
+                        return;
+                    }
+                }
+            } catch (e) {}
+            setCorrespondances(initialCorrespondances);
         });
 
         return () => unsub();
@@ -396,7 +400,7 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
         printWindow.document.write(`
             <html>
                 <head>
-                    <title>${escapeHtml(selectedCorr.subject || 'Correspondance')}</title>
+                    <title>${selectedCorr?.subject || 'Correspondance'}</title>
                     <style>
                         body {
                             font-family: 'Times New Roman', Times, serif;
@@ -440,7 +444,7 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
                         <h1>CABINET KBB & ASSOCIÉS</h1>
                         <p>Avocats Associés au Barreau de Kinshasa / Gombe - RDC</p>
                     </div>
-                    <div class="letter-content">${escapeHtml(selectedCorr.content || '')}</div>
+                    <div class="letter-content">${selectedCorr?.content || ''}</div>
                     <script>
                         window.onload = function() {
                             window.print();

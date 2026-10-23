@@ -103,7 +103,15 @@ const GestionPage: FC<GestionPageProps> = (props) => {
             setCorrespondances(list);
         }, (err) => {
             console.warn("Notice loading correspondances in admin (Quota/Offline):", err);
-            setCorrespondances([]);
+            try {
+                const cached = localStorage.getItem('kbb_cache_correspondances');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setCorrespondances(parsed);
+                    }
+                }
+            } catch (e) {}
         });
         return () => unsub();
     }, []);
