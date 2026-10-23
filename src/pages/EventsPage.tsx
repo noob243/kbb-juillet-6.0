@@ -2,7 +2,6 @@
 import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import EventModal from '../components/modals/EventModal';
-import { DetailedEditModal } from '../components/DetailedEditModal';
 import { CalendarIcon, MapPinIcon, HandshakeIcon, AttachmentIcon, FolderIcon, UsersIcon, SearchIcon, EditIcon, ClipboardIcon } from '../components/Icons';
 import { Event, Avocat, EventReport, Personnel } from '../types';
 import { usePagination } from '../hooks/usePagination';
@@ -23,7 +22,6 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
     const pagination = usePagination<Event>(events);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-    const [editingEvent, setEditingEvent] = useState<Event | null>(null);
     const [isAllReportsModalOpen, setIsAllReportsModalOpen] = useState<boolean>(false);
 
     // Report Form state
@@ -241,15 +239,6 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
                                                 <SearchIcon className="w-3.5 h-3.5" />
                                                 <span>Détails</span>
                                             </button>
-                                            {onUpdateEvent && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEditingEvent(event)}
-                                                    className="text-amber-700 hover:text-amber-900 font-bold text-2xs bg-amber-50 hover:bg-amber-100 px-2.5 py-1.5 rounded-xl transition"
-                                                >
-                                                    Modifier
-                                                </button>
-                                            )}
                                             <button 
                                                 onClick={() => {
                                                     setReportingEvent(event);
@@ -292,22 +281,6 @@ const EventsPage: FC<EventsPageProps> = ({ events, onAddEvent, onUpdateEvent, av
             </PageContainer>
             
             <EventModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={onAddEvent} avocats={avocats} personnels={personnels} events={events} />
-            {editingEvent && onUpdateEvent && (
-                <DetailedEditModal
-                    type="event"
-                    item={editingEvent}
-                    clients={[]}
-                    avocats={avocats}
-                    onClose={() => setEditingEvent(null)}
-                    onSave={(updatedEvent) => {
-                        const event = updatedEvent as Event;
-                        onUpdateEvent(event);
-                        if (selectedEvent?.id === event.id) setSelectedEvent(event);
-                        if (viewingReportsEvent?.id === event.id) setViewingReportsEvent(event);
-                        setEditingEvent(null);
-                    }}
-                />
-            )}
 
             {/* Event Details Model */}
             {selectedEvent && (

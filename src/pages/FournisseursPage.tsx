@@ -1,7 +1,6 @@
 import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import FournisseurModal from '../components/modals/FournisseurModal';
-import { DetailedEditModal } from '../components/DetailedEditModal';
 import { SearchIcon, UsersIcon, TrashIcon, CourthouseIcon, PhoneIcon, BriefcaseIcon, MailIcon } from '../components/Icons';
 import { Fournisseur } from '../types';
 import { AppUser } from '../types/rbac';
@@ -12,18 +11,16 @@ import PaginationControls from '../components/common/PaginationControls';
 interface FournisseursPageProps {
   fournisseurs: Fournisseur[];
   onAddFournisseur: (fournisseur: Fournisseur) => void;
-  onUpdateFournisseur?: (fournisseur: Fournisseur) => void;
   onDeleteFournisseur: (id: string) => void;
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
   currentUser?: AppUser | null;
   currentUserInfo?: { email?: string; name?: string; role?: string };
 }
 
-const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFournisseur, onUpdateFournisseur, onDeleteFournisseur, onSendEmail, currentUser }) => {
+const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFournisseur, onDeleteFournisseur, onSendEmail, currentUser }) => {
     const userCanDelete = canDeleteRecord(currentUser);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedFournisseur, setSelectedFournisseur] = useState<Fournisseur | null>(null);
-    const [editingFournisseur, setEditingFournisseur] = useState<Fournisseur | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
 
     const formatCurrency = (amount: number) => {
@@ -164,15 +161,6 @@ const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFourni
                                                             >
                                                                 Voir
                                                             </button>
-                                                            {onUpdateFournisseur && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setEditingFournisseur(f)}
-                                                                    className="px-2 py-1 text-2xs font-extrabold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition"
-                                                                >
-                                                                    Modifier
-                                                                </button>
-                                                            )}
                                                             <button
                                                                 onClick={() => {
                                                                     onSendEmail(
@@ -388,20 +376,6 @@ const FournisseursPage: FC<FournisseursPageProps> = ({ fournisseurs, onAddFourni
                 onSave={onAddFournisseur} 
                 fournisseurs={fournisseurs}
             />
-            {editingFournisseur && onUpdateFournisseur && (
-                <DetailedEditModal
-                    type="fournisseur"
-                    item={editingFournisseur}
-                    clients={[]}
-                    avocats={[]}
-                    onClose={() => setEditingFournisseur(null)}
-                    onSave={(updatedFournisseur) => {
-                        onUpdateFournisseur(updatedFournisseur as Fournisseur);
-                        if (selectedFournisseur?.id === updatedFournisseur.id) setSelectedFournisseur(updatedFournisseur as Fournisseur);
-                        setEditingFournisseur(null);
-                    }}
-                />
-            )}
         </>
     );
 };

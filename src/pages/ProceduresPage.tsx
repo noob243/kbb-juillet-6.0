@@ -12,7 +12,6 @@ import {
   Building, 
   Calendar, 
   FileText, 
-  Edit3, 
   Trash2, 
   Filter,
   CheckCircle,
@@ -56,8 +55,6 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProcedure, setEditingProcedure] = useState<CaseProcedure | null>(null);
-  const [oldCaseId, setOldCaseId] = useState<string>(''); // To track if we changed the associated Case
 
   // Form states
   const [formData, setFormData] = useState({
@@ -124,8 +121,6 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
   const closedCount = allProcedures.filter(p => p.status === 'Clôturé' || p.status === 'Clôturé / Terminé').length;
 
   const handleOpenAddModal = () => {
-    setEditingProcedure(null);
-    setOldCaseId('');
     setFormData({
       name: '',
       instance: '',
@@ -138,21 +133,6 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (proc: CaseProcedure & { caseId: string }) => {
-    setEditingProcedure(proc);
-    setOldCaseId(proc.caseId);
-    setFormData({
-      name: proc.name,
-      instance: proc.instance || '',
-      objet: proc.objet || '',
-      dateDebut: proc.dateDebut || '',
-      dateFin: proc.dateFin || '',
-      status: proc.status || 'En cours',
-      associatedCaseId: proc.caseId
-    });
-    setIsModalOpen(true);
-  };
-
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.associatedCaseId) {
@@ -161,9 +141,7 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
     }
 
     const totalProceduresCount = cases.reduce((acc, c) => acc + (c.procedures?.length || 0), 0);
-    const procedureId = editingProcedure 
-      ? editingProcedure.id 
-      : `PROC-${totalProceduresCount + 1}`;
+    const procedureId = `PROC-${totalProceduresCount + 1}`;
 
     const updatedProc: CaseProcedure = {
       id: procedureId,
@@ -175,48 +153,13 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
       status: formData.status
     };
 
-    if (editingProcedure) {
-      // Editing existing procedure
-      if (oldCaseId === formData.associatedCaseId) {
-        // Just update in the same case
-        const sourceCase = cases.find(c => c.id === oldCaseId);
-        if (sourceCase) {
-          const updatedProcs = (sourceCase.procedures || []).map(p => p.id === procedureId ? updatedProc : p);
-          onUpdateCase({
-            ...sourceCase,
-            procedures: updatedProcs
-          });
-        }
-      } else {
-        // Remove from old case and add to new case
-        const oldCase = cases.find(c => c.id === oldCaseId);
-        if (oldCase) {
-          const updatedOldProcs = (oldCase.procedures || []).filter(p => p.id !== procedureId);
-          onUpdateCase({
-            ...oldCase,
-            procedures: updatedOldProcs
-          });
-        }
-
-        const newCase = cases.find(c => c.id === formData.associatedCaseId);
-        if (newCase) {
-          const updatedNewProcs = [...(newCase.procedures || []), updatedProc];
-          onUpdateCase({
-            ...newCase,
-            procedures: updatedNewProcs
-          });
-        }
-      }
-    } else {
-      // Creating a brand new procedure
-      const targetCase = cases.find(c => c.id === formData.associatedCaseId);
-      if (targetCase) {
-        const updatedNewProcs = [...(targetCase.procedures || []), updatedProc];
-        onUpdateCase({
-          ...targetCase,
-          procedures: updatedNewProcs
-        });
-      }
+    const targetCase = cases.find(c => c.id === formData.associatedCaseId);
+    if (targetCase) {
+      const updatedNewProcs = [...(targetCase.procedures || []), updatedProc];
+      onUpdateCase({
+        ...targetCase,
+        procedures: updatedNewProcs
+      });
     }
 
     setIsModalOpen(false);
@@ -417,13 +360,6 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
                   <Download className="w-3.5 h-3.5" /> PDF
                 </button>
                 <button 
-                  onClick={() => handleOpenEditModal(proc)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-[#15447c] rounded-lg text-xs font-extrabold transition"
-                  title="Modifier la procédure"
-                >
-                  <Edit3 className="w-3.5 h-3.5" /> Modifier
-                </button>
-                <button 
                   type="button"
                   disabled={!userCanDelete}
                   onClick={() => {
@@ -460,7 +396,7 @@ const ProceduresPage: FC<ProceduresPageProps> = ({ cases = [], onUpdateCase, sea
           <div className="bg-white dark:bg-[#0e1726] rounded-2xl shadow-2xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto border border-gray-150 dark:border-slate-800">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-xl font-black text-slate-800 dark:text-slate-100">
-                {editingProcedure ? "Modifier la Procédure" : "Nouvelle Procédure"}
+                Nouvelle Procédure
               </h2>
               <button 
                 onClick={() => setIsModalOpen(false)} 

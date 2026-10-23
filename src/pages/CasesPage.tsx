@@ -60,7 +60,6 @@ const CasesPage: FC<CasesPageProps> = ({
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedCase, setSelectedCase] = useState<Case | null>(null);
-    const [editingCase, setEditingCase] = useState<Case | null>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
@@ -819,18 +818,6 @@ const CasesPage: FC<CasesPageProps> = ({
                                     Propriété exclusive de KBB Law Firm scp
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {onUpdateCase && (
-                                        <button
-                                            data-pdf-ignore
-                                            onClick={() => {
-                                                setEditingCase(selectedCase);
-                                                setSelectedCase(null);
-                                            }}
-                                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold py-2 px-4 rounded-xl transition duration-150 text-sm"
-                                        >
-                                            Modifier le dossier
-                                        </button>
-                                    )}
                                     <button
                                         data-pdf-ignore
                                         onClick={() => setSelectedCase(null)}
@@ -844,20 +831,6 @@ const CasesPage: FC<CasesPageProps> = ({
                     </div>
                 );
             })()}
-
-            {editingCase && (
-                <DetailedEditModal
-                    type="case"
-                    item={editingCase}
-                    clients={safeClients}
-                    avocats={safeAvocats}
-                    onClose={() => setEditingCase(null)}
-                    onSave={(updatedCase) => {
-                        onUpdateCase?.(updatedCase as Case);
-                        setEditingCase(null);
-                    }}
-                />
-            )}
 
             <InvoiceDetailModal 
                 isOpen={!!selectedInvoice}

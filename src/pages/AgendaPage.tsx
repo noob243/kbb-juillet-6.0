@@ -38,7 +38,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     };
 
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [taskBeingEdited, setTaskBeingEdited] = useState<Task | null>(null);
     const [priorityFilter, setPriorityFilter] = useState<'all' | 'Haute' | 'Moyenne' | 'Basse'>('all');
     const [showOnlyOverdue, setShowOnlyOverdue] = useState(false);
     const [activeView, setActiveView] = useState<'calendar' | 'list'>('calendar');
@@ -229,7 +228,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     };
 
     const handleOpenWithPrefilled = (dateStr: string) => {
-        setTaskBeingEdited(null);
         setPrefilledStartDate(dateStr);
         setIsModalOpen(true);
     };
@@ -724,19 +722,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                                                         </span>
                                                     </td>
                                                     <td className="p-4 align-middle text-right whitespace-nowrap">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setTaskBeingEdited(task);
-                                                                setIsModalOpen(true);
-                                                            }}
-                                                            className="font-extrabold text-indigo-600 hover:text-indigo-850 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-lg text-xs transition inline-flex items-center gap-1 shadow-2xs cursor-pointer"
-                                                            title="Modifier la tâche"
-                                                        >
-                                                            <EditIcon className="w-3.5 h-3.5" />
-                                                            <span>Modifier</span>
-                                                        </button>
                                                     </td>
                                                 </tr>
                                                 {isExpanded && (
@@ -750,17 +735,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                                                                             <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">
                                                                                 Informations Générales
                                                                             </span>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    setTaskBeingEdited(task);
-                                                                                    setIsModalOpen(true);
-                                                                                }}
-                                                                                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer"
-                                                                            >
-                                                                                <EditIcon className="w-3 h-3" />
-                                                                                Éditer
-                                                                            </button>
                                                                         </div>
                                                                         <div className="space-y-2 text-xs">
                                                                             <div className="flex justify-between items-center py-0.5">
@@ -1056,16 +1030,10 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                 onClose={() => {
                     setIsModalOpen(false);
                     setPrefilledStartDate(null);
-                    setTaskBeingEdited(null);
                 }} 
-                taskToEdit={taskBeingEdited}
+                taskToEdit={null}
                 onSave={(savedTask) => {
-                    if (taskBeingEdited && onUpdateTask) {
-                        onUpdateTask(savedTask as Task);
-                    } else {
-                        onAddTask(savedTask);
-                    }
-                    setTaskBeingEdited(null);
+                    onAddTask(savedTask);
                 }} 
                 cases={cases} 
                 lawyers={lawyers} 
@@ -1306,19 +1274,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                                     Voir dans la liste
                                 </button>
                                 <div className="flex items-center gap-2">
-                                    <button 
-                                        type="button" 
-                                        onClick={() => {
-                                            const taskToEdit = selectedTaskForModal;
-                                            handleCloseTaskModal();
-                                            setTaskBeingEdited(taskToEdit);
-                                            setIsModalOpen(true);
-                                        }}
-                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shadow-xs cursor-pointer"
-                                    >
-                                        <EditIcon className="w-3.5 h-3.5" />
-                                        Modifier la tâche
-                                    </button>
                                     <button 
                                         type="button" 
                                         onClick={handleCloseTaskModal} 

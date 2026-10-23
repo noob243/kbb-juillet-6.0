@@ -1087,38 +1087,6 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
                                 </div>
 
                                 <div className="flex items-center gap-1.5">
-                                    {/* Edit button */}
-                                    <button
-                                        onClick={() => {
-                                            setIsWriting(true);
-                                            const isRec = selectedCorr.nature === 'Reçue / Perçue' || selectedCorr.id?.startsWith('KBB-RECEPT');
-                                            setNature(isRec ? 'Reçue / Perçue' : 'Émise');
-                                            setDestinataireCabinet(selectedCorr.destinataireCabinet || '');
-                                            setExpediteurExterne(selectedCorr.expediteurExterne || selectedCorr.recipientName || '');
-                                            setFormType(selectedCorr.type || 'Lettre');
-                                            setRecipientName(selectedCorr.recipientName);
-                                            setRecipientEmail(selectedCorr.recipientEmail || '');
-                                            setDestinataire(selectedCorr.destinataire || '');
-                                            setAvocatSignataireId(selectedCorr.avocatSignataireId || '');
-                                            setDateEmission(selectedCorr.dateEmission || selectedCorr.date || '');
-                                            setDateReception(selectedCorr.dateReception || '');
-                                            setSubject(selectedCorr.subject);
-                                            setContent(selectedCorr.content);
-                                            setStatus(selectedCorr.status);
-                                            setSelectedCaseId(selectedCorr.caseId || '');
-                                            setSelectedProcedureId(selectedCorr.procedureId || '');
-                                            setPiecesJointes(selectedCorr.piecesJointes || []);
-                                            setCustomId(selectedCorr.id);
-                                        }}
-                                        className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-350 transition duration-150 flex items-center gap-1 text-xs font-semibold cursor-pointer"
-                                        title="Éditer la correspondance"
-                                    >
-                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                        </svg>
-                                        Modifier
-                                    </button>
-
                                     {/* Send email button */}
                                     <button
                                         onClick={() => handleSendViaEmail(selectedCorr)}
