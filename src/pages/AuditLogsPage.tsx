@@ -135,7 +135,7 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
                 module: 'Audit',
                 description: `Session fermée à distance pour l'utilisateur ${userToDisconnect.fullName} (${userToDisconnect.email}) par l'administrateur ${currentUser?.fullName || currentUser?.email || 'Admin'}.`,
                 userName: currentUser?.fullName || 'Admin',
-                userEmail: currentUser?.email || 'admin@cabinet.com'
+                userEmail: currentUser?.email || ''
             });
 
             if (onAddToast) {
@@ -429,7 +429,7 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
                     <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                             {paginatedConnectedUsers.map((user) => {
-                                const isAdmin = currentUser?.role === 'Admin' || currentUser?.email === 'jeremieshusu4@gmail.com' || currentUser?.email === 'patbonles@gmail.com';
+                                const isAdmin = currentUser?.role === 'Admin' || currentUser?.isSuperAdmin === true;
                                 const isSelf = (user.email || '').toLowerCase() === (currentUser?.email || '').toLowerCase();
                                 const initial = user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U';
 

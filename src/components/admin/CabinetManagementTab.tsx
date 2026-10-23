@@ -2,9 +2,7 @@ import React, { FC, useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import { CabinetSettings, UserRole } from '../../types/rbac';
-import { initializeAllFirestoreCollections } from '../../services/initCollectionsService';
 import firebaseConfigJson from '../../../firebase-applet-config.json';
-import { safeSetItem } from '../../utils/storageHelper';
 
 interface CabinetManagementTabProps {
   onAddToast: (type: 'success' | 'error', message: string) => void;
@@ -40,15 +38,6 @@ export const CabinetManagementTab: FC<CabinetManagementTabProps> = ({ onAddToast
   });
 
   useEffect(() => {
-    try {
-      const cached = localStorage.getItem('kbb_cabinet_settings');
-      if (cached) {
-        setSettings(prev => ({ ...prev, ...JSON.parse(cached) }));
-      }
-    } catch (e) {
-      console.warn('Erreur lecture cache cabinet:', e);
-    }
-
     // Charger les informations persistées depuis Firestore cabinet_info
     const fetchCabinetInfo = async () => {
       try {
@@ -79,7 +68,6 @@ export const CabinetManagementTab: FC<CabinetManagementTabProps> = ({ onAddToast
     e.preventDefault();
     setIsSaving(true);
     try {
-      safeSetItem('kbb_cabinet_settings', JSON.stringify(settings));
       await setDoc(doc(db, 'cabinet_info', 'cabinet_default'), {
         name: settings.cabinetName,
         email: settings.cabinetEmail,
@@ -259,11 +247,7 @@ export const CabinetManagementTab: FC<CabinetManagementTabProps> = ({ onAddToast
 
             <button
               type="button"
-              disabled={isSyncing}
-              onClick={() => {
-                setConfirmText('');
-                setIsConfirmModalOpen(true);
-              }}
+              disabled
               className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
             >
               {isSyncing ? (
@@ -279,7 +263,7 @@ export const CabinetManagementTab: FC<CabinetManagementTabProps> = ({ onAddToast
                   <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  <span>Créer & Initialiser toutes les 14 Collections</span>
+                  <span>Initialisation désactivée</span>
                 </>
               )}
             </button>
@@ -418,7 +402,7 @@ export const CabinetManagementTab: FC<CabinetManagementTabProps> = ({ onAddToast
                   setConfirmText('');
                   setIsSyncing(true);
                   onAddToast('success', "Initialisation des 14 collections Firestore en cours...");
-                  const result = await initializeAllFirestoreCollections();
+                  const result = { success: false, message: 'La réinitialisation des collections est désactivée.' };
                   setIsSyncing(false);
                   if (result.success) {
                     onAddToast('success', result.message);

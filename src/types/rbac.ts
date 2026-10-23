@@ -59,8 +59,7 @@ export interface AppUser {
   canDelete?: boolean; // Droit de suppression explicite (non accordé par défaut)
   isDeleted?: boolean; // Soft delete
   status: 'Actif' | 'Inactif' | 'Archivé';
-  password?: string; // Mot de passe du compte (permettant la connexion immédiate)
-  tempPassword?: string; // Mot de passe initial / temporaire
+  authUid?: string;
   phone?: string;
   photoUrl?: string;
   linkedEntityId?: string; // Id in Avocat or Personnel collection

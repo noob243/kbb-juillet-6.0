@@ -44,12 +44,8 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
 
     // Determine admin status
-    const userEmail = currentUserInfo?.email?.trim().toLowerCase();
-    const isAdmin = currentUserInfo?.role === 'Admin' || 
-                    userEmail === 'jeremieshusu4@gmail.com' || 
-                    userEmail === 'hervemich@icloud.com' || 
-                    userEmail === 'patbonles@gmail.com' || 
-                    userEmail === 'admin@cabinet.com';
+    const userEmail = currentUser?.email?.trim().toLowerCase();
+    const isAdmin = currentUser?.role === 'Admin' || currentUser?.isSuperAdmin === true;
 
     // Invoices visible to the current user (Creators see their created invoices; Admins see all)
     const userVisibleInvoices = invoices.filter(inv => {

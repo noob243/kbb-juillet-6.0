@@ -349,9 +349,9 @@ const PersonnelModal: FC<PersonnelModalProps> = ({ isOpen, onClose, onSave, pers
                                 value={formData.password} 
                                 onChange={handleChange} 
                                 className="w-full p-2.5 border border-indigo-200 rounded-lg text-sm bg-white" 
-                                placeholder="Saisir un mot de passe (min. 6 caractères)" 
+                                placeholder="Saisir un mot de passe (min. 12 caractères)"
                                 required={requiresAuth}
-                                minLength={6}
+                                minLength={12}
                             />
                             <p className="text-[10px] text-indigo-600 font-bold">⚠️ En tant que {formData.role.toLowerCase()}, cet agent disposera d'un accès avec ce mot de passe.</p>
                         </div>

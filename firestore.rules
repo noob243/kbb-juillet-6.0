@@ -1,105 +1,171 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Helpers ---
-    function isSignedIn() { return true; }
-
-    // --- Default Deny / Open for App ---
-    match /{document=**} {
-      allow read, write: if true;
+    function isVerifiedMember() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.appAccess == true
+        && request.auth.token.isDeleted != true;
     }
 
-    // --- Collections ---
-    match /auditLogs {
-      allow list, read: if isSignedIn();
+    function isAdmin() {
+      return isVerifiedMember() && request.auth.token.role == 'Admin';
     }
+
+    function hasPermission(permission) {
+      return isAdmin()
+        || (isVerifiedMember()
+          && request.auth.token.permissions is list
+          && permission in request.auth.token.permissions);
+    }
+
+    function canDelete(module) {
+      return hasPermission(module) && hasPermission('can_delete');
+    }
+
+    function validId(id) {
+      return id is string && id.matches('^[A-Za-z0-9_-]{1,128}$');
+    }
+
     match /auditLogs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      allow get, list: if hasPermission('audit');
+      allow create: if isVerifiedMember()
+        && validId(logId)
+        && request.resource.data.actorUid == request.auth.uid
+        && request.resource.data.userEmail == request.auth.token.email
+        && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
     }
 
-    match /presences {
-      allow list, read, write: if isSignedIn();
-    }
-    match /presences/{userId} {
-      allow read, write: if isSignedIn();
-    }
-
-    match /users {
-      allow list, read, write: if isSignedIn();
-    }
     match /users/{userId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /correspondances {
-      allow list, read, write: if isSignedIn();
-    }
-    match /correspondances/{docId} {
-      allow read, write: if isSignedIn();
-    }
-    match /cabinet_info {
-      allow list, read, write: if isSignedIn();
-    }
-    match /cabinet_info/{docId} {
-      allow read, write: if isSignedIn();
-    }
-    match /system_settings {
-      allow list, read, write: if isSignedIn();
-    }
-    match /system_settings/{docId} {
-      allow read, write: if isSignedIn();
+      allow get, list: if isVerifiedMember()
+        && (hasPermission('dashboard') || resource.data.authUid == request.auth.uid);
+      allow create: if isAdmin() && validId(userId);
+      allow update: if isAdmin()
+        || (isVerifiedMember()
+          && resource.data.authUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'isOnline', 'lastActiveAt', 'updatedAt', 'fullName', 'phone', 'photoUrl'
+            ]));
+      allow delete: if isAdmin();
     }
 
-    match /clients {
-      allow list, read, write: if isSignedIn();
+    match /presences/{userId} {
+      allow get, list: if hasPermission('dashboard');
+      allow create, update: if isVerifiedMember()
+        && request.resource.data.email == request.auth.token.email
+        && userId == request.auth.token.email;
+      allow delete: if isVerifiedMember()
+        && userId == request.auth.token.email;
     }
-    match /clients/{clientId} {
-      allow read, write: if isSignedIn();
+
+    match /clients/{id} {
+      allow read: if hasPermission('clients');
+      allow create, update: if hasPermission('clients') && validId(id);
+      allow delete: if canDelete('clients') && validId(id);
     }
-    match /cases {
-      allow list, read, write: if isSignedIn();
+
+    match /cases/{id} {
+      allow read: if hasPermission('cases');
+      allow create, update: if hasPermission('cases') && validId(id);
+      allow delete: if canDelete('cases') && validId(id);
     }
-    match /cases/{caseId} {
-      allow read, write: if isSignedIn();
+
+    match /events/{id} {
+      allow read: if hasPermission('events');
+      allow create, update: if hasPermission('events') && validId(id);
+      allow delete: if canDelete('events') && validId(id);
     }
-    match /events {
-      allow list, read, write: if isSignedIn();
+
+    match /avocats/{id} {
+      allow read: if hasPermission('avocats');
+      allow create: if hasPermission('avocats') && validId(id);
+      allow update: if (hasPermission('avocats')
+          || (isVerifiedMember()
+            && resource.data.emails is list
+            && request.auth.token.email in resource.data.emails
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['fullName', 'phone', 'photoUrl'])))
+        && validId(id);
+      allow delete: if canDelete('avocats') && validId(id);
     }
-    match /events/{eventId} {
-      allow read, write: if isSignedIn();
+
+    match /personnels/{id} {
+      allow read: if hasPermission('personnels');
+      allow create: if hasPermission('personnels') && validId(id);
+      allow update: if (hasPermission('personnels')
+          || (isVerifiedMember()
+            && resource.data.email == request.auth.token.email
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['fullName', 'phone', 'photoUrl'])))
+        && validId(id);
+      allow delete: if canDelete('personnels') && validId(id);
     }
-    match /avocats {
-      allow list, read, write: if isSignedIn();
+
+    match /fournisseurs/{id} {
+      allow read: if hasPermission('suppliers');
+      allow create, update: if hasPermission('suppliers') && validId(id);
+      allow delete: if canDelete('suppliers') && validId(id);
     }
-    match /avocats/{avocatId} {
-      allow read, write: if isSignedIn();
+
+    match /tasks/{id} {
+      allow read: if hasPermission('agenda');
+      allow create, update: if hasPermission('agenda') && validId(id);
+      allow delete: if canDelete('agenda') && validId(id);
     }
-    match /tasks {
-      allow list, read, write: if isSignedIn();
+
+    match /invoices/{id} {
+      allow read: if hasPermission('billing');
+      allow create, update: if hasPermission('billing') && validId(id);
+      allow delete: if canDelete('billing') && validId(id);
     }
-    match /tasks/{taskId} {
-      allow read, write: if isSignedIn();
+
+    match /correspondances/{id} {
+      allow read: if hasPermission('correspondance');
+      allow create, update: if hasPermission('correspondance') && validId(id);
+      allow delete: if canDelete('correspondance') && validId(id);
     }
-    match /invoices {
-      allow list, read, write: if isSignedIn();
+
+    match /chat_messages/{id} {
+      allow read: if hasPermission('chat');
+      allow create: if hasPermission('chat')
+        && validId(id)
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmail == request.auth.token.email;
+      allow update: if hasPermission('chat')
+        && resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderEmail == request.auth.token.email;
+      allow delete: if isAdmin()
+        || (hasPermission('chat') && resource.data.senderUid == request.auth.uid);
     }
-    match /invoices/{invoiceId} {
-      allow read, write: if isSignedIn();
+
+    match /forum_topics/{id} {
+      allow read: if hasPermission('chat');
+      allow create: if hasPermission('chat')
+        && validId(id)
+        && request.resource.data.authorUid == request.auth.uid;
+      allow update: if hasPermission('chat')
+        && resource.data.authorUid == request.auth.uid
+        && request.resource.data.authorUid == request.auth.uid;
+      allow delete: if isAdmin();
     }
-    match /personnels {
-      allow list, read, write: if isSignedIn();
+
+    match /cabinet_info/{id} {
+      allow read: if hasPermission('gestion_cabinet');
+      allow create, update: if hasPermission('gestion_cabinet') && validId(id);
+      allow delete: if isAdmin() && validId(id);
     }
-    match /personnels/{personnelId} {
-      allow read, write: if isSignedIn();
+
+    match /system_settings/{id} {
+      allow read: if hasPermission('gestion_cabinet');
+      allow create, update: if hasPermission('gestion_cabinet') && validId(id);
+      allow delete: if isAdmin() && validId(id);
     }
-    match /fournisseurs {
-      allow list, read, write: if isSignedIn();
-    }
-    match /fournisseurs/{fournisseurId} {
-      allow read, write: if isSignedIn();
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

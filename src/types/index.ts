@@ -229,6 +229,8 @@ export interface Fournisseur {
 export interface AuditLog {
   id: string;
   timestamp: string;
+  actorUid?: string;
+  createdAt?: unknown;
   date?: string;
   heure?: string;
   userEmail: string;

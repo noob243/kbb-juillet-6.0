@@ -359,7 +359,7 @@ const AvocatModal: FC<AvocatModalProps> = ({ isOpen, onClose, onSave, avocats = 
 
                             <div>
                                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Mot de passe de connexion <span className="text-rose-500">*</span></label>
-                                <input type="password" name="password" placeholder="Saisir un mot de passe (min. 6 caractères)" value={formData.password} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-500 outline-hidden transition" required minLength={6} />
+                                <input type="password" name="password" placeholder="Saisir un mot de passe (min. 12 caractères)" value={formData.password} onChange={handleChange} className="w-full p-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500/15 focus:border-indigo-500 outline-hidden transition" required minLength={12} />
                             </div>
                         </div>
 

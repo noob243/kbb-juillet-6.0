@@ -176,11 +176,7 @@ export function hasPermission(user: AppUser | null, moduleKey: ModuleKey): boole
 
   // Primary Super Admin check
   const isSuperAdmin = user.role === 'Admin' ||
-    user.isSuperAdmin === true ||
-    user.email === 'jeremieshusu4@gmail.com' ||
-    user.email === 'hervemich@icloud.com' ||
-    user.email === 'patbonles@gmail.com' ||
-    user.email === 'admin@cabinet.com';
+    user.isSuperAdmin === true;
   
   if (isSuperAdmin) return true;
 
@@ -198,18 +194,7 @@ export function canDeleteRecord(user: AppUser | Partial<AppUser> | { role?: stri
     return true;
   }
 
-  // 2. Administrateurs système identifiés par email
-  const adminEmails = [
-    'jeremieshusu4@gmail.com',
-    'hervemich@icloud.com',
-    'patbonles@gmail.com',
-    'admin@cabinet.com'
-  ];
-  if (user.email && adminEmails.includes(user.email.toLowerCase().trim())) {
-    return true;
-  }
-
-  // 3. Pour tous les autres rôles (Avocats, Personnels), le droit de suppression doit impérativement leur être octroyé expressément par un administrateur
+  // Pour les autres rôles, le droit de suppression doit être explicitement accordé.
   return (Array.isArray(user.permissions) && user.permissions.includes('can_delete')) || user.canDelete === true;
 }
 
@@ -233,16 +218,6 @@ export function canManageCaseConfidentiality(
 
   // 1. Tous les administrateurs ont le droit de masquer ou rendre ouvert le contenu
   if (user.role === 'Admin' || user.isSuperAdmin === true || (typeof user.role === 'string' && user.role.toLowerCase().includes('admin'))) {
-    return true;
-  }
-
-  const adminEmails = [
-    'jeremieshusu4@gmail.com',
-    'hervemich@icloud.com',
-    'patbonles@gmail.com',
-    'admin@cabinet.com'
-  ];
-  if (user.email && adminEmails.includes(user.email.toLowerCase().trim())) {
     return true;
   }
 
@@ -311,16 +286,6 @@ export function canViewFinancialStats(
     return true;
   }
 
-  const adminEmails = [
-    'jeremieshusu4@gmail.com',
-    'hervemich@icloud.com',
-    'patbonles@gmail.com',
-    'admin@cabinet.com'
-  ];
-  if (effectiveUser.email && adminEmails.includes(effectiveUser.email.toLowerCase().trim())) {
-    return true;
-  }
-
   // 2. Associés (Avocats Associés / Partners du cabinet)
   const func = (effectiveUser.functionRole || '').toLowerCase();
   const cabStatus = ((effectiveUser as any).cabinetStatus || '').toLowerCase();
@@ -365,16 +330,6 @@ export function canViewPresentation(
     return true;
   }
 
-  const adminEmails = [
-    'jeremieshusu4@gmail.com',
-    'hervemich@icloud.com',
-    'patbonles@gmail.com',
-    'admin@cabinet.com'
-  ];
-  if (user.email && adminEmails.includes(user.email.toLowerCase().trim())) {
-    return true;
-  }
-
   // 2. Associés (Avocats Associés / Partners du cabinet)
   const func = (user.functionRole || '').toLowerCase();
   const cabStatus = ((user as any).cabinetStatus || '').toLowerCase();
@@ -399,11 +354,7 @@ export function filterNavItemsByPermissions<T extends { name: string; isGroup?: 
   if (user.isDeleted || user.hasAppAccess === false) return [];
 
   const isSuperAdmin = user.role === 'Admin' ||
-    user.isSuperAdmin === true ||
-    user.email === 'jeremieshusu4@gmail.com' ||
-    user.email === 'hervemich@icloud.com' ||
-    user.email === 'patbonles@gmail.com' ||
-    user.email === 'admin@cabinet.com';
+    user.isSuperAdmin === true;
 
   const routeToModuleMap: Record<string, ModuleKey> = {
     'Dashboard': 'dashboard',

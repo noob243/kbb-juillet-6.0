@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "latest",
     "firebase": "^12.14.0",
     "lucide-react": "^1.18.0",
     "motion": "^12.40.0",
@@ -23,5 +22,9 @@
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.14.6",
+    "image-size": "^2.0.3"
   }
 }
