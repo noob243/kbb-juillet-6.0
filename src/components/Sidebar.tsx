@@ -2,7 +2,7 @@
 import React, { FC, useState, useEffect } from 'react';
 import { Icon, DashboardIcon, ClientsIcon, CasesIcon, EventsIcon, AgendaIcon, ChatIcon, BillingIcon, AvocatsIcon, StaffIcon, PersonnelsIcon, SuppliersIcon, LogoutIcon, EyeIcon, AIIcon } from './Icons';
 import { AppUser, ModuleKey, UserRole } from '../types/rbac';
-import { hasPermission, DEFAULT_ROLE_PERMISSIONS, ALL_MODULE_PERMISSIONS, canViewPresentation, canAccessBilling } from '../services/rbacService';
+import { hasPermission, DEFAULT_ROLE_PERMISSIONS, canViewPresentation, canAccessBilling } from '../services/rbacService';
 
 interface SidebarProps {
   currentPage: string;
@@ -68,7 +68,7 @@ const Sidebar: FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout, curr
             userType: (currentUserInfo.role === 'Avocat' ? 'Avocat' : 'Personnel') as any,
             functionRole: 'Staff',
             status: 'Actif' as const,
-            permissions: DEFAULT_ROLE_PERMISSIONS[currentUserInfo.role as UserRole] || ALL_MODULE_PERMISSIONS.map(m => m.key),
+            permissions: DEFAULT_ROLE_PERMISSIONS[currentUserInfo.role as UserRole] || [],
             hasAppAccess: true,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),

@@ -1,6 +1,6 @@
 import React, { FC, ReactNode } from 'react';
 import { AppUser, ModuleKey, UserRole } from '../../types/rbac';
-import { hasPermission, DEFAULT_ROLE_PERMISSIONS, ALL_MODULE_PERMISSIONS } from '../../services/rbacService';
+import { hasPermission, DEFAULT_ROLE_PERMISSIONS } from '../../services/rbacService';
 
 interface ProtectedGuardProps {
   user: AppUser | null;
@@ -15,7 +15,7 @@ export const ProtectedGuard: FC<ProtectedGuardProps> = ({ user, moduleKey, child
     email: currentUserInfo.email,
     fullName: currentUserInfo.name,
     role: currentUserInfo.role as any,
-    permissions: DEFAULT_ROLE_PERMISSIONS[currentUserInfo.role as UserRole] || ALL_MODULE_PERMISSIONS.map(m => m.key),
+    permissions: DEFAULT_ROLE_PERMISSIONS[currentUserInfo.role as UserRole] || [],
     hasAppAccess: true,
     createdAt: '',
     isDeleted: false

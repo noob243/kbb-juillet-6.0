@@ -349,6 +349,7 @@ function App() {
     const [events, setEvents] = useState<Event[]>(() => loadLocalCache('kbb_cache_events'));
     const [tasks, setTasks] = useState<Task[]>(() => loadLocalCache('kbb_cache_tasks'));
     const [invoices, setInvoices] = useState<Invoice[]>(() => loadLocalCache('kbb_cache_invoices'));
+    const [invoiceSyncError, setInvoiceSyncError] = useState<string | null>(null);
     const [avocats, setAvocats] = useState<Avocat[]>(() => loadLocalCache('kbb_cache_avocats'));
     const [personnels, setPersonnels] = useState<Personnel[]>(() => loadLocalCache('kbb_cache_personnels'));
     const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(() => loadLocalCache('kbb_cache_fournisseurs'));
@@ -631,10 +632,12 @@ function App() {
                     });
                 });
                 setInvoices(list);
+                setInvoiceSyncError(null);
             }, (err) => {
-                console.warn("Invoices subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<Invoice>('kbb_cache_invoices');
-                if (cached.length > 0) setInvoices(cached);
+                console.error('Invoices subscription failed:', err?.code || 'unknown');
+                setInvoiceSyncError(err?.code === 'permission-denied'
+                    ? 'La lecture des factures est refusée par Firebase. Un administrateur doit vérifier votre accès au module Facturation.'
+                    : 'Les factures n’ont pas pu être chargées. Vérifiez la connexion puis rechargez la page.');
             }));
 
             delayedUnsubs.push(onSnapshot(collection(db, 'avocats'), (snap) => {
@@ -1674,7 +1677,7 @@ function App() {
                     />
                 </ProtectedGuard>
             );
-            case 'Facturation': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="billing"><BillingPage invoices={invoices} cases={filteredCases} currentUserInfo={currentUserInfo} currentUser={currentUserObj} avocats={avocats} users={usersList} onAddInvoice={handleAddInvoice} onSendEmail={triggerEmail} clients={clients} /></ProtectedGuard>;
+            case 'Facturation': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="billing"><BillingPage invoices={invoices} dataError={invoiceSyncError} cases={filteredCases} currentUserInfo={currentUserInfo} currentUser={currentUserObj} avocats={avocats} users={usersList} onAddInvoice={handleAddInvoice} onSendEmail={triggerEmail} clients={clients} /></ProtectedGuard>;
             case 'Avocats': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="avocats"><AvocatsPage avocats={avocats} tasks={tasks} onAddAvocat={handleAddAvocat} onDeleteAvocat={handleDeleteAvocat} onSendEmail={triggerEmail} correspondances={correspondances} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Personnels': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="personnels"><PersonnelsPage personnels={personnels} onAddPersonnel={handleAddPersonnel} onDeletePersonnel={handleDeletePersonnel} onSendEmail={triggerEmail} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Fournisseurs': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="suppliers"><FournisseursPage fournisseurs={fournisseurs} onAddFournisseur={handleAddFournisseur} onDeleteFournisseur={handleDeleteFournisseur} onSendEmail={triggerEmail} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;

@@ -14,6 +14,7 @@ import { recentFirst } from '../utils/recentFirst';
 
 interface BillingPageProps {
   invoices: Invoice[];
+  dataError?: string | null;
   cases: Case[];
   clients: Client[];
   avocats?: Avocat[];
@@ -25,7 +26,7 @@ interface BillingPageProps {
   onNavigate?: (pageName: string, query?: string) => void;
 }
 
-const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avocats = [], users = [], currentUserInfo, currentUser, onAddInvoice, onSendEmail, onNavigate }) => {
+const BillingPage: FC<BillingPageProps> = ({ invoices, dataError, cases, clients = [], avocats = [], users = [], currentUserInfo, currentUser, onAddInvoice, onSendEmail, onNavigate }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDetailInvoice, setSelectedDetailInvoice] = useState<Invoice | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -171,13 +172,19 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
     return (
         <>
             <PageContainer title="Cabinet Facturation" buttonLabel="Enregistrer une facture" onButtonClick={() => setIsModalOpen(true)}>
+                {dataError && (
+                    <div role="alert" className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                        <strong>Chargement des factures impossible.</strong>
+                        <p className="mt-1">{dataError} Aucune facture n’a été supprimée.</p>
+                    </div>
+                )}
                 
                 {/* 1. Row of KPI Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
                     {/* card 1 */}
                     <div className="bg-white border border-gray-150 p-5 rounded-2xl shadow-2xs">
                         <span className="block text-3xs font-black uppercase text-slate-400 tracking-wider">Total facturé</span>
-                        <h3 className="text-xl font-black text-slate-800 mt-1">{formatCurrency(totalInvoiced)}</h3>
+                        <h3 className="text-xl font-black text-slate-800 mt-1">{dataError ? '—' : formatCurrency(totalInvoiced)}</h3>
                         <div className="flex items-center gap-1.5 mt-2">
                             <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.2 rounded font-bold">Selon votre périmètre</span>
                         </div>
@@ -185,7 +192,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                     {/* card 2 */}
                     <div className="bg-white border border-gray-150 p-5 rounded-2xl shadow-2xs">
                         <span className="block text-3xs font-black uppercase text-slate-400 tracking-wider">Montant recouvré</span>
-                        <h3 className="text-xl font-black text-emerald-700 mt-1">{formatCurrency(totalPaid)}</h3>
+                        <h3 className="text-xl font-black text-emerald-700 mt-1">{dataError ? '—' : formatCurrency(totalPaid)}</h3>
                         <div className="flex items-center gap-1.5 mt-2">
                             <span className="text-[10px] text-emerald-700 font-bold">Sols encaissés</span>
                         </div>
@@ -193,7 +200,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                     {/* card 3 */}
                     <div className="bg-white border border-gray-150 p-5 rounded-2xl shadow-2xs">
                         <span className="block text-3xs font-black uppercase text-slate-400 tracking-wider opacity-90">Factures impayées</span>
-                        <h3 className="text-xl font-black text-rose-600 mt-1">{formatCurrency(totalUnpaid)}</h3>
+                        <h3 className="text-xl font-black text-rose-600 mt-1">{dataError ? '—' : formatCurrency(totalUnpaid)}</h3>
                         <div className="flex items-center gap-1.5 mt-2">
                             <span className="text-[10px] text-rose-500 bg-rose-50 border border-rose-100 px-1.5 py-0.2 rounded font-bold">{unpaidCount} dossier(s) en attente</span>
                         </div>
@@ -201,7 +208,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                     {/* card 4 */}
                     <div className="bg-white border border-gray-150 p-5 rounded-2xl shadow-2xs">
                         <span className="block text-3xs font-black uppercase text-slate-400 tracking-wider">Taux de recouvrement</span>
-                        <h3 className="text-xl font-black text-[#15447c] mt-1">{recoveryRate.toFixed(1)}%</h3>
+                        <h3 className="text-xl font-black text-[#15447c] mt-1">{dataError ? '—' : `${recoveryRate.toFixed(1)}%`}</h3>
                         <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                             <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${Math.min(100, recoveryRate)}%` }}></div>
                         </div>

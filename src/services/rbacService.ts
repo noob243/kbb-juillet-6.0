@@ -142,7 +142,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModuleKey[]> = {
     'events',
     'chat',
     'correspondance',
-    'billing',
     'avocats',
     'personnels',
     'suppliers'
@@ -168,10 +167,6 @@ export function hasPermission(user: AppUser | null, moduleKey: ModuleKey): boole
   // Specific check for 'can_delete'
   if (moduleKey === 'can_delete') {
     return canDeleteRecord(user);
-  }
-
-  if (moduleKey === 'billing' && (user.role === 'Avocat' || user.userType === 'Avocat')) {
-    return true;
   }
 
   // Primary Super Admin check
@@ -304,18 +299,9 @@ export function canViewFinancialStats(
 
 export function canAccessBilling(
   user: AppUser | null,
-  userInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null
+  _userInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null
 ): boolean {
-  if (user?.isDeleted || user?.hasAppAccess === false) return false;
-
-  const isLawyer = user
-    ? user.role === 'Avocat' || user.userType === 'Avocat'
-    : userInfo?.role === 'Avocat';
-  if (isLawyer) {
-    return true;
-  }
-
-  return hasPermission(user, 'billing') || canViewFinancialStats(user, userInfo);
+  return hasPermission(user, 'billing');
 }
 
 export function canViewPresentation(
