@@ -62,19 +62,8 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, dataError, cases, clients
         return 'Non réglée';
     };
 
-    // Determine admin status
-    const userEmail = currentUser?.email?.trim().toLowerCase();
-    const isAdmin = currentUser?.role === 'Admin' || currentUser?.isSuperAdmin === true;
-
-    // Invoices visible to the current user (Creators see their created invoices; Admins see all)
-    const userVisibleInvoices = invoices.filter(inv => {
-        if (isAdmin) return true;
-        if (!inv.createdBy) return true; // Default/initial invoices remain visible
-        return (inv.createdBy || '').trim().toLowerCase() === userEmail;
-    });
-
-    // Calculate billing summary statistics on userVisibleInvoices
-    const billingInvoices = userVisibleInvoices.map(invoice => {
+    // Firestore already limits this collection to users with the billing permission.
+    const billingInvoices = invoices.map(invoice => {
         const amounts = getInvoiceAmounts(invoice);
         return {
             ...invoice,
