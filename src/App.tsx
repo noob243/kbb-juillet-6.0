@@ -958,7 +958,7 @@ function App() {
                 console.warn("Notice during background sync of users:", err);
             });
         }
-    }, [isDbConnected, avocats.length, personnels.length, usersList.length]);
+    }, [isDbConnected, avocats.length, personnels.length]);
 
     const lawyerNames = avocats.map((a) => a.fullName);
 

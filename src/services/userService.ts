@@ -86,12 +86,12 @@ export async function syncUsersWithFirestore(
             usersById.set(docSnap.id, { ...user, id: docSnap.id });
           }
         });
-        if (!initialLoadComplete) initialLoadComplete = true;
-        notify();
 
         if (page.size < pageSize) break;
         cursor = page.docs[page.docs.length - 1];
       }
+      initialLoadComplete = true;
+      notify();
     } catch (error) {
       handleError(error instanceof Error ? error : new Error(String(error)));
     }
