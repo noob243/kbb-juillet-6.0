@@ -28,21 +28,13 @@ const escapeHtml = (value) => String(value ?? '')
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&#39;');
 
-async function revokeUserAccess({ uid, email }) {
+async function revokeUserAccess(uid) {
+  if (typeof uid !== 'string' || !uid) return;
   let authUser;
-  if (typeof uid === 'string' && uid) {
-    try {
-      authUser = await auth.getUser(uid);
-    } catch (error) {
-      if (error.code !== 'auth/user-not-found') throw error;
-    }
-  }
-  if (!authUser && typeof email === 'string' && email.trim()) {
-    try {
-      authUser = await auth.getUserByEmail(email.trim().toLowerCase());
-    } catch (error) {
-      if (error.code !== 'auth/user-not-found') throw error;
-    }
+  try {
+    authUser = await auth.getUser(uid);
+  } catch (error) {
+    if (error.code !== 'auth/user-not-found') throw error;
   }
   if (authUser) {
     await auth.setCustomUserClaims(authUser.uid, {
@@ -73,6 +65,26 @@ function claimsForProfile(profile) {
   };
 }
 
+function isEligibleProfile(profile) {
+  return profile.status === 'Actif'
+    && profile.isDeleted !== true
+    && profile.hasAppAccess !== false
+    && profile.personnelCategory !== 'Office';
+}
+
+async function findEligibleProfilesByEmail(email) {
+  const usersRef = firestore.collection('users');
+  const matches = await usersRef.where('email', '==', email).get();
+  let profileDocs = matches.docs;
+  if (matches.empty) {
+    const allProfiles = await usersRef.get();
+    profileDocs = allProfiles.docs.filter(profileDoc =>
+      String(profileDoc.data().email || '').trim().toLowerCase() === email
+    );
+  }
+  return profileDocs.filter(profileDoc => isEligibleProfile(profileDoc.data()));
+}
+
 exports.syncUserClaims = onDocumentWritten({
   document: 'users/{userId}',
   database: FIRESTORE_DATABASE_ID
@@ -81,14 +93,14 @@ exports.syncUserClaims = onDocumentWritten({
   const before = event.data?.before;
   if (!after?.exists) {
     const previousProfile = before?.data();
-    await revokeUserAccess({ uid: previousProfile?.authUid, email: previousProfile?.email });
+    await revokeUserAccess(previousProfile?.authUid);
     return;
   }
 
   const profile = after.data();
   const email = typeof profile.email === 'string' ? profile.email.trim().toLowerCase() : '';
   if (!email) {
-    await revokeUserAccess({ uid: profile.authUid });
+    await revokeUserAccess(profile.authUid);
     return;
   }
   const previousProfile = before?.data();
@@ -96,11 +108,27 @@ exports.syncUserClaims = onDocumentWritten({
     ? previousProfile.email.trim().toLowerCase()
     : '';
   if (previousProfile && previousEmail !== email) {
-    await revokeUserAccess({ uid: previousProfile.authUid, email: previousProfile.email });
+    await revokeUserAccess(previousProfile.authUid);
   }
 
+  if (!profile.authUid && !isEligibleProfile(profile)) return;
+
   try {
-    const authUser = await auth.getUserByEmail(email);
+    let authUser;
+    if (profile.authUid) {
+      authUser = await auth.getUser(profile.authUid);
+      if (authUser.email?.trim().toLowerCase() !== email) {
+        throw new Error(`Linked Firebase account email does not match profile ${event.params.userId}.`);
+      }
+    } else {
+      const eligibleProfiles = await findEligibleProfilesByEmail(email);
+      if (eligibleProfiles.length !== 1 || eligibleProfiles[0].id !== event.params.userId) {
+        console.warn(`Skipping ambiguous profile claim sync for user ${event.params.userId}.`);
+        return;
+      }
+      authUser = await auth.getUserByEmail(email);
+    }
+
     await auth.setCustomUserClaims(authUser.uid, claimsForProfile(profile));
     if (profile.authUid !== authUser.uid || 'password' in profile || 'tempPassword' in profile) {
       await after.ref.update({
@@ -122,26 +150,13 @@ exports.resolveAuthenticatedUserProfile = onCall(async (request) => {
   }
 
   const email = tokenEmail.trim().toLowerCase();
-  const usersRef = firestore.collection('users');
-  let matches = await usersRef.where('email', '==', email).limit(2).get();
-  let profileDocs = matches.docs;
-  if (matches.empty) {
-    const allProfiles = await usersRef.get();
-    profileDocs = allProfiles.docs.filter(profileDoc =>
-        String(profileDoc.data().email || '').trim().toLowerCase() === email
-    ).slice(0, 2);
-  }
-
+  const profileDocs = await findEligibleProfilesByEmail(email);
   if (profileDocs.length !== 1) {
     throw new HttpsError('failed-precondition', 'Le profil de ce compte est absent ou ambigu. Contactez un administrateur.');
   }
 
   const profileDoc = profileDocs[0];
   const profile = profileDoc.data();
-  if (profile.status !== 'Actif' || profile.isDeleted === true
-    || profile.hasAppAccess === false || profile.personnelCategory === 'Office') {
-    throw new HttpsError('permission-denied', 'Ce compte ne dispose pas d’un accès actif à l’application.');
-  }
   if (profile.authUid && profile.authUid !== uid) {
     throw new HttpsError('permission-denied', 'Ce profil est déjà associé à un autre compte. Contactez un administrateur.');
   }

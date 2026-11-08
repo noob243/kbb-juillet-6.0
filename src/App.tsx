@@ -247,8 +247,8 @@ function App() {
 
     useEffect(() => {
         if (currentUserInfo?.email) {
-            const cleanEmail = (currentUserInfo.email || '').trim().toLowerCase();
-            const found = usersList.find(u => (u.email || '').trim().toLowerCase() === cleanEmail);
+            const firebaseUid = auth.currentUser?.uid;
+            const found = usersList.find(u => u.authUid === firebaseUid);
             if (found) {
                 if (found.photoUrl && currentUserInfo.photoUrl !== found.photoUrl) {
                     setCurrentUserInfo(prev => prev ? { ...prev, photoUrl: found.photoUrl, name: found.fullName || prev.name } : null);
@@ -320,9 +320,8 @@ function App() {
     // Check if current user session was disconnected remotely by an Admin (Instant detection)
     useEffect(() => {
         if (!isAuthenticated || !currentUserObj?.id || !usersList.length) return;
-        const currentInList = usersList.find(u => 
-            u.id === currentUserObj.id || 
-            (u.email && currentUserObj.email && (u.email || '').trim().toLowerCase() === (currentUserObj.email || '').trim().toLowerCase())
+        const currentInList = usersList.find(u =>
+            u.id === currentUserObj.id || u.authUid === auth.currentUser?.uid
         );
 
         if (currentInList) {
