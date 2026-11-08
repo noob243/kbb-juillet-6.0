@@ -2,7 +2,7 @@
 import React, { FC, useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { auth } from '../firebase';
-import { sendEmailVerification, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getAuthenticatedUserByEmail } from '../services/userService';
 import { AppUser } from '../types/rbac';
 
@@ -17,6 +17,28 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
     const [password, setPassword] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    const handlePasswordRecovery = async () => {
+        const cleanEmail = email.trim();
+        if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+            setShowRecoveryMsg(false);
+            setErrorMsg('Saisissez une adresse e-mail valide pour recevoir le lien de réinitialisation.');
+            return;
+        }
+
+        setErrorMsg('');
+        setIsLoading(true);
+        try {
+            await sendPasswordResetEmail(auth, cleanEmail);
+            setShowRecoveryMsg(true);
+        } catch (err: any) {
+            console.error('Password reset request failed:', err?.code || err);
+            setShowRecoveryMsg(false);
+            setErrorMsg('Impossible d’envoyer le lien de réinitialisation. Vérifiez l’adresse ou réessayez plus tard.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -116,7 +138,7 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
                                     <label className="block text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider">Mot de passe</label>
                                     <button 
                                         type="button"
-                                        onClick={() => setShowRecoveryMsg(true)}
+                                        onClick={handlePasswordRecovery}
                                         className="text-xs text-[#15447c] dark:text-indigo-400 hover:underline font-bold"
                                         disabled={isLoading}
                                     >
