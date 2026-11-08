@@ -142,6 +142,69 @@ exports.syncUserClaims = onDocumentWritten({
   }
 });
 
+exports.deleteManagedUser = onCall(async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid || request.auth?.token?.email_verified !== true) {
+    throw new HttpsError('unauthenticated', 'Une session administrateur vérifiée est requise.');
+  }
+
+  const callerProfiles = await firestore.collection('users')
+    .where('authUid', '==', callerUid)
+    .limit(1)
+    .get();
+  const callerProfile = callerProfiles.docs[0]?.data();
+  if (!callerProfile || callerProfile.role !== 'Admin'
+    || callerProfile.status !== 'Actif' || callerProfile.isDeleted === true) {
+    throw new HttpsError('permission-denied', 'Seul un administrateur actif peut supprimer un compte.');
+  }
+
+  const userId = request.data?.userId;
+  if (typeof userId !== 'string' || !userId || userId.length > 128) {
+    throw new HttpsError('invalid-argument', 'Identifiant utilisateur invalide.');
+  }
+
+  const profileRef = firestore.collection('users').doc(userId);
+  const profileSnapshot = await profileRef.get();
+  if (!profileSnapshot.exists) {
+    throw new HttpsError('not-found', 'Le profil utilisateur est introuvable.');
+  }
+
+  const profile = profileSnapshot.data();
+  if (profile.isDeleted !== true && profile.status !== 'Archivé') {
+    throw new HttpsError('failed-precondition', 'Archivez le compte avant de le supprimer définitivement.');
+  }
+
+  if (profile.role === 'Admin' && profile.status === 'Actif' && profile.isDeleted !== true) {
+    const activeAdmins = await firestore.collection('users')
+      .where('role', '==', 'Admin')
+      .where('status', '==', 'Actif')
+      .get();
+    if (activeAdmins.docs.filter(doc => doc.data().isDeleted !== true).length <= 1) {
+      throw new HttpsError('failed-precondition', 'Impossible de supprimer le dernier administrateur actif.');
+    }
+  }
+
+  let authUid = profile.authUid;
+  if (!authUid && profile.hasAppAccess !== false && profile.personnelCategory !== 'Office'
+    && typeof profile.email === 'string') {
+    try {
+      authUid = (await auth.getUserByEmail(profile.email.trim().toLowerCase())).uid;
+    } catch (error) {
+      if (error.code !== 'auth/user-not-found') throw error;
+    }
+  }
+
+  if (authUid) {
+    try {
+      await auth.deleteUser(authUid);
+    } catch (error) {
+      if (error.code !== 'auth/user-not-found') throw error;
+    }
+  }
+  await profileRef.delete();
+  return { ok: true };
+});
+
 exports.resolveAuthenticatedUserProfile = onCall(async (request) => {
   const uid = request.auth?.uid;
   const tokenEmail = request.auth?.token?.email;

@@ -1,8 +1,8 @@
 import React, { FC, useState } from 'react';
 import { AppUser, CreateUserPayload, FunctionRole, ModuleKey, PersonnelCategory, UserRole } from '../../types/rbac';
 import { Avocat, Personnel } from '../../types';
-import { ALL_MODULE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from '../../services/rbacService';
-import { createNewUser, restoreUser, softDeleteUser, updateAppUser } from '../../services/userService';
+import { ALL_MODULE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from '../../services/rbacService';
+import { createNewUser, restoreUser, softDeleteUser, hardDeleteUser, updateAppUser, updateAppUserAndLinkedRecord } from '../../services/userService';
 import { PermissionMatrix } from './PermissionMatrix';
 import { dbCreateDoc, sanitizeForFirestore } from '../../lib/firestoreService';
 import { FormField, FormInput, FormSelect } from '../common/FormControls';
@@ -25,8 +25,8 @@ interface UserManagementTabProps {
   currentUser?: AppUser | null;
   onRefreshUsers?: () => void;
   onAddToast?: (type: 'success' | 'error', message: string) => void;
-  onAddAvocat?: (avocat: Avocat, password?: string) => void;
-  onAddPersonnel?: (personnel: Personnel, password?: string) => void;
+  onAddAvocat?: (avocat: Avocat, password?: string, accountAlreadyCreated?: boolean) => void | Promise<void>;
+  onAddPersonnel?: (personnel: Personnel, password?: string, accountAlreadyCreated?: boolean) => void | Promise<void>;
 }
 
 export const UserManagementTab: FC<UserManagementTabProps> = ({
@@ -37,7 +37,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
   onAddAvocat,
   onAddPersonnel
 }) => {
-  const userCanDelete = canDeleteRecord(currentUser);
+  const userCanManageAccounts = currentUser?.role === 'Admin';
   const [activeSubTab, setActiveSubTab] = useState<'create' | 'edit' | 'archive'>('create');
 
   // --- SUB-SECTION 1: CREATION STATE ---
@@ -118,12 +118,17 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userCanManageAccounts) {
+      onAddToast('error', 'Seuls les administrateurs peuvent gérer les comptes utilisateurs.');
+      return;
+    }
     if (!createFullName.trim() || !createEmail.trim()) {
       onAddToast('error', 'Le nom complet et l\'email sont requis.');
       return;
     }
 
     setIsSubmitting(true);
+    let createdUserId: string | null = null;
     try {
       const payload: CreateUserPayload = {
         fullName: createFullName,
@@ -137,6 +142,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
       };
 
       const newUser = await createNewUser(payload);
+      createdUserId = newUser.id;
 
       // If Avocat, automatically build and register Avocat entity in Avocats collection & local storage
       if (createType === 'Avocat') {
@@ -176,21 +182,12 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
           bankAccounts: validBankAccounts
         };
 
-        // 1. Save directly to Firestore
-        try {
-          await dbCreateDoc('avocats', newAvocat.id, sanitizeForFirestore(newAvocat));
-        } catch (err) {
-          console.warn("Firestore avocat insert notice:", err);
-        }
-
-        // 2. Trigger callback if passed
         if (onAddAvocat) {
-          try {
-            await onAddAvocat(newAvocat, createTempPassword);
-          } catch (e) {
-            console.warn("onAddAvocat callback notice:", e);
-          }
+          await onAddAvocat(newAvocat, createTempPassword, true);
+        } else {
+          await dbCreateDoc('avocats', newAvocat.id, sanitizeForFirestore(newAvocat));
         }
+        await updateAppUser(newUser.id, { linkedEntityId: newAvocat.id });
       } else if (createType === 'Personnel') {
         // Build and register Personnel entity in Personnels collection & local storage
         const cleanName = createFullName.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
@@ -224,21 +221,12 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
           bankAccounts: validBankAccounts
         };
 
-        // 1. Save directly to Firestore under personnels
-        try {
-          await dbCreateDoc('personnels', newPersonnel.id, sanitizeForFirestore(newPersonnel));
-        } catch (err) {
-          console.warn("Firestore personnel insert notice:", err);
-        }
-
-        // 2. Trigger callback if passed
         if (onAddPersonnel) {
-          try {
-            await onAddPersonnel(newPersonnel, createTempPassword);
-          } catch (e) {
-            console.warn("onAddPersonnel callback notice:", e);
-          }
+          await onAddPersonnel(newPersonnel, createTempPassword, true);
+        } else {
+          await dbCreateDoc('personnels', newPersonnel.id, sanitizeForFirestore(newPersonnel));
         }
+        await updateAppUser(newUser.id, { linkedEntityId: newPersonnel.id });
       }
 
       onAddToast('success', `Compte utilisateur ${newUser.fullName} ${createType === 'Avocat' ? 'et fiche Avocat' : 'et fiche Personnel'} créés avec succès !`);
@@ -265,7 +253,10 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
       onRefreshUsers();
     } catch (err: any) {
       console.error("Failed to create user:", err);
-      onAddToast('error', err.message || 'Erreur lors de la création de l\'utilisateur.');
+      const message = err.message || 'Erreur lors de la création de l\'utilisateur.';
+      onAddToast('error', createdUserId
+        ? `Le compte a été créé, mais la fiche associée n’a pas pu être enregistrée : ${message}`
+        : message);
     } finally {
       setIsSubmitting(false);
     }
@@ -287,11 +278,15 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
 
   const handleEditSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userCanManageAccounts) {
+      onAddToast('error', 'Seuls les administrateurs peuvent gérer les comptes utilisateurs.');
+      return;
+    }
     if (!editingUserId) return;
 
     try {
       const isDeleteGranted = editRole === 'Admin' || editPermissions.includes('can_delete');
-      await updateAppUser(editingUserId, {
+      const updates = {
         fullName: editFullName,
         email: editEmail,
         phone: editPhone,
@@ -302,22 +297,48 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
         permissions: editUserType === 'Personnel' && editCategory === 'Office' ? [] : editPermissions,
         canDelete: isDeleteGranted,
         status: editStatus
-      });
+      };
+      const targetUser = safeUsersList.find(u => u.id === editingUserId);
+      const linkedRecord = targetUser?.linkedEntityId
+        ? editUserType === 'Avocat'
+          ? {
+              collectionName: 'avocats' as const,
+              id: targetUser.linkedEntityId,
+              updates: {
+                fullName: editFullName,
+                phone: editPhone,
+                cabinetRole: editFunctionRole
+              }
+            }
+          : {
+              collectionName: 'personnels' as const,
+              id: targetUser.linkedEntityId,
+              updates: {
+                fullName: editFullName,
+                phone: editPhone,
+                role: editFunctionRole,
+                category: editCategory
+              }
+            }
+        : undefined;
+      await updateAppUserAndLinkedRecord(editingUserId, updates, linkedRecord);
 
       onAddToast('success', 'Profil et autorisations mis à jour avec succès.');
       setEditingUserId(null);
       onRefreshUsers();
     } catch (err: any) {
-      onAddToast('error', 'Impossible de mettre à jour le profil.');
+      console.error('Failed to update user profile:', err);
+      const message = err?.message || 'Erreur inconnue.';
+      onAddToast('error', `Impossible de mettre à jour le profil : ${message}`);
     }
   };
 
   const handleSoftDelete = async (user: AppUser) => {
-    if (!userCanDelete) {
-      onAddToast('error', "Action refusée : Seuls les administrateurs ou les utilisateurs autorisés peuvent archiver/supprimer des comptes.");
+    if (!userCanManageAccounts) {
+      onAddToast('error', 'Seuls les administrateurs peuvent archiver des comptes utilisateurs.');
       return;
     }
-    if (user.role === 'Admin' && (users || []).filter(u => u.role === 'Admin' && !u.isDeleted).length <= 1) {
+    if (user.role === 'Admin' && (users || []).filter(u => u.role === 'Admin' && !u.isDeleted && u.status === 'Actif').length <= 1) {
       onAddToast('error', 'Impossible d\'archiver le seul administrateur actif du cabinet.');
       return;
     }
@@ -328,24 +349,53 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
         onAddToast('success', `Le compte de ${user.fullName} a été archivé avec succès.`);
         onRefreshUsers();
       } catch (err) {
-        onAddToast('error', 'Erreur lors de l\'archivage du compte.');
+        console.error('Failed to archive user:', err);
+        onAddToast('error', `Erreur lors de l'archivage du compte : ${err instanceof Error ? err.message : 'erreur inconnue'}`);
+      }
+    }
+  };
+
+  const handleHardDelete = async (user: AppUser) => {
+    if (!userCanManageAccounts) {
+      onAddToast('error', 'Seuls les administrateurs peuvent supprimer définitivement des comptes.');
+      return;
+    }
+    if (user.role === 'Admin' && !isUserArchived(user) && (users || []).filter(u => u.role === 'Admin' && !isUserArchived(u) && u.status === 'Actif').length <= 1) {
+      onAddToast('error', 'Impossible de supprimer l\'administrateur unique du cabinet.');
+      return;
+    }
+
+    if (window.confirm(`ATTENTION : Souhaitez-vous vraiment supprimer DÉFINITIVEMENT le compte de ${user.fullName} ? Cette action supprimera son profil et son compte de connexion.`)) {
+      try {
+        await hardDeleteUser(user.id);
+        onAddToast('success', `Le compte de ${user.fullName} a été supprimé définitivement.`);
+        onRefreshUsers();
+      } catch (err) {
+        console.error('Failed to permanently delete user:', err);
+        onAddToast('error', `Erreur lors de la suppression définitive du compte : ${err instanceof Error ? err.message : 'erreur inconnue'}`);
       }
     }
   };
 
   const handleRestore = async (user: AppUser) => {
+    if (!userCanManageAccounts) {
+      onAddToast('error', 'Seuls les administrateurs peuvent réactiver des comptes utilisateurs.');
+      return;
+    }
     try {
       await restoreUser(user.id);
       onAddToast('success', `Le compte de ${user.fullName} a été réactivé avec succès.`);
       onRefreshUsers();
     } catch (err) {
-      onAddToast('error', 'Erreur lors de la réactivation du compte.');
+      console.error('Failed to restore user:', err);
+      onAddToast('error', `Erreur lors de la réactivation du compte : ${err instanceof Error ? err.message : 'erreur inconnue'}`);
     }
   };
 
+  const isUserArchived = (user: AppUser) => user.isDeleted === true || user.status === 'Archivé';
   const safeUsersList = users || [];
-  const activeUsers = safeUsersList.filter(u => !u.isDeleted);
-  const archivedUsers = safeUsersList.filter(u => u.isDeleted);
+  const activeUsers = safeUsersList.filter(u => !isUserArchived(u));
+  const archivedUsers = safeUsersList.filter(isUserArchived);
 
   const query = (searchEditQuery || '').toLowerCase();
   const filteredActiveUsers = activeUsers.filter(u => 
@@ -359,6 +409,11 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
 
   return (
     <div className="space-y-6">
+      {!userCanManageAccounts && (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-800">
+          La gestion et la modification des comptes sont réservées aux administrateurs. Les listes restent consultables selon vos autorisations.
+        </div>
+      )}
       {/* Navigation Sub-Tabs */}
       <div className="flex flex-wrap items-center gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
         <button
@@ -1112,8 +1167,8 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
           <div className="flex justify-end pt-2">
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-2.5 rounded-xl bg-[#15447c] hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2"
+              disabled={isSubmitting || !userCanManageAccounts}
+              className="px-6 py-2.5 rounded-xl bg-[#15447c] hover:bg-indigo-700 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <span>Création en cours...</span>
@@ -1229,16 +1284,18 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                       <td className="p-3 text-right flex items-center justify-end gap-2">
                         <button
                           type="button"
+                          disabled={!userCanManageAccounts}
                           onClick={() => startEditUser(u)}
-                          className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 rounded-lg font-bold text-xs transition"
+                          className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 rounded-lg font-bold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           Éditer
                         </button>
                         {u.isOnline && (
                           <button
                             type="button"
+                            disabled={!userCanManageAccounts}
                             onClick={() => handleForceLogout(u)}
-                            className="px-3 py-1 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 hover:bg-rose-100 rounded-lg font-bold text-xs transition"
+                            className="px-3 py-1 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 hover:bg-rose-100 rounded-lg font-bold text-xs transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             Déconnecter
                           </button>
@@ -1298,6 +1355,12 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                         type="email"
                         value={editEmail}
                         onChange={e => setEditEmail(e.target.value)}
+                        disabled={Boolean(safeUsersList.find(user => user.id === editingUserId)?.authUid)
+                          || safeUsersList.find(user => user.id === editingUserId)?.hasAppAccess !== false}
+                        title={safeUsersList.find(user => user.id === editingUserId)?.authUid
+                          || safeUsersList.find(user => user.id === editingUserId)?.hasAppAccess !== false
+                          ? "L’adresse e-mail de connexion est gérée par Firebase Authentication."
+                          : undefined}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-medium"
                       />
                     </div>
@@ -1368,7 +1431,8 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
 
                     <button
                       type="submit"
-                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md"
+                      disabled={!userCanManageAccounts}
+                      className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Enregistrer les modifications
                     </button>
@@ -1418,16 +1482,16 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
 
                     <button
                       type="button"
-                      disabled={!userCanDelete}
+                      disabled={!userCanManageAccounts}
                       onClick={() => {
-                        if (userCanDelete) {
+                        if (userCanManageAccounts) {
                           handleSoftDelete(u);
                         }
                       }}
-                      className={userCanDelete
+                      className={userCanManageAccounts
                         ? "px-3 py-1.5 bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 hover:bg-rose-100 rounded-lg text-xs font-bold border border-rose-200 dark:border-rose-900 transition cursor-pointer"
                         : "px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 rounded-lg text-xs font-bold border border-slate-200 dark:border-slate-700 transition cursor-not-allowed opacity-60"}
-                      title={userCanDelete ? `Archiver le compte de ${u.fullName}` : "Droit de suppression non accordé (Contactez un administrateur)"}
+                      title={userCanManageAccounts ? `Archiver le compte de ${u.fullName}` : "Seuls les administrateurs peuvent gérer les comptes utilisateurs"}
                     >
                       Archiver
                     </button>
@@ -1469,10 +1533,20 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
 
                       <button
                         type="button"
+                        disabled={!userCanManageAccounts}
                         onClick={() => handleRestore(u)}
-                        className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 rounded-lg text-xs font-bold border border-emerald-200 dark:border-emerald-900 transition"
+                        className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 rounded-lg text-xs font-bold border border-emerald-200 dark:border-emerald-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Réactiver
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!userCanManageAccounts}
+                        onClick={() => handleHardDelete(u)}
+                        className="px-3 py-1.5 bg-white dark:bg-slate-900 text-rose-700 dark:text-rose-400 hover:bg-rose-100 rounded-lg text-xs font-bold border border-rose-200 dark:border-rose-900 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Supprimer définitivement le profil et son compte de connexion"
+                      >
+                        Supprimer définitivement
                       </button>
                     </div>
                   ))

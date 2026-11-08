@@ -1221,7 +1221,7 @@ function App() {
         }
     };
 
-    const handleAddAvocat = async (newAvocat: Avocat, password?: string) => {
+    const handleAddAvocat = async (newAvocat: Avocat, password?: string, accountAlreadyCreated = false) => {
         const email = (newAvocat.emails && newAvocat.emails[0]) ? newAvocat.emails[0].trim().toLowerCase() : '';
         const cleanPassword = (password || '').trim();
 
@@ -1230,83 +1230,100 @@ function App() {
             return;
         }
 
-        // 1. Create or sync AppUser in users collection with password
-        try {
-            const existingUser = usersList.find(u => (u.email || '').trim().toLowerCase() === email);
-            if (!existingUser) {
-                await createNewUser({
-                    email: email,
-                    fullName: newAvocat.fullName,
-                    userType: 'Avocat',
-                    functionRole: newAvocat.cabinetRole || newAvocat.cabinetStatus || 'Avocat Collaborateur',
-                    phone: newAvocat.phone || '',
-                    permissions: DEFAULT_ROLE_PERMISSIONS.Avocat,
-                    linkedEntityId: newAvocat.id,
-                    password: cleanPassword
-                });
-            } else {
-                await updateAppUser(existingUser.id, {
-                    fullName: newAvocat.fullName,
-                    linkedEntityId: newAvocat.id
-                });
-            }
-        } catch (uErr) {
-            console.warn("Could not save avocat to users collection:", uErr);
-        }
-
-        setAvocats(prev => [...prev, newAvocat]);
-        try {
-            const { id, ...cleanAvocat } = newAvocat;
-            const payload = { ...cleanAvocat, photo: null };
-            await dbCreateDoc('avocats', id, payload);
-            triggerToast('success', `Profil de l'avocat ${newAvocat.fullName} créé avec mot de passe opérationnel !`);
-            logActivity('Ajout', 'Collaborateurs', `Création du profil de l'avocat ${newAvocat.fullName} (${newAvocat.cabinetStatus})`, payload);
-        } catch (err) {
-            triggerToast('error', "Erreur d'enregistrement de l'avocat.");
-        }
-    };
-
-    const handleAddPersonnel = async (newPersonnel: Personnel, password?: string) => {
-        const email = newPersonnel.email ? newPersonnel.email.trim().toLowerCase() : '';
-        const cleanPassword = (password || '').trim();
-        const isOfficePersonnel = newPersonnel.category === 'Office';
-
-        if (email) {
+        let userProvisioningError: unknown;
+        if (!accountAlreadyCreated) {
             try {
                 const existingUser = usersList.find(u => (u.email || '').trim().toLowerCase() === email);
                 if (!existingUser) {
                     await createNewUser({
                         email: email,
-                        fullName: newPersonnel.fullName,
-                        userType: 'Personnel',
-                        personnelCategory: (newPersonnel.category as PersonnelCategory) || 'Administratif',
-                        functionRole: newPersonnel.role || 'Personnel',
-                        phone: newPersonnel.phone || '',
-                        hasAppAccess: !isOfficePersonnel,
-                        permissions: !isOfficePersonnel ? DEFAULT_ROLE_PERMISSIONS.Personnel : [],
-                        linkedEntityId: newPersonnel.id,
-                        password: isOfficePersonnel ? undefined : cleanPassword
+                        fullName: newAvocat.fullName,
+                        userType: 'Avocat',
+                        functionRole: newAvocat.cabinetRole || newAvocat.cabinetStatus || 'Avocat Collaborateur',
+                        phone: newAvocat.phone || '',
+                        permissions: DEFAULT_ROLE_PERMISSIONS.Avocat,
+                        linkedEntityId: newAvocat.id,
+                        password: cleanPassword
                     });
                 } else {
                     await updateAppUser(existingUser.id, {
-                        fullName: newPersonnel.fullName,
-                        linkedEntityId: newPersonnel.id
+                        fullName: newAvocat.fullName,
+                        linkedEntityId: newAvocat.id
                     });
                 }
             } catch (uErr) {
-                console.warn("Could not save personnel to users collection:", uErr);
+                console.error("Could not save avocat to users collection:", uErr);
+                userProvisioningError = uErr;
+            }
+        }
+
+        try {
+            const { id, ...cleanAvocat } = newAvocat;
+            const payload = { ...cleanAvocat, photo: null };
+            await dbCreateDoc('avocats', id, payload);
+            setAvocats(prev => prev.some(avocat => avocat.id === id) ? prev : [...prev, newAvocat]);
+            if (userProvisioningError) {
+                triggerToast('error', `La fiche de l'avocat est enregistrée, mais son compte utilisateur n'a pas pu être créé : ${userProvisioningError instanceof Error ? userProvisioningError.message : 'erreur inconnue'}`);
+            } else if (!accountAlreadyCreated) {
+                triggerToast('success', `Profil de l'avocat ${newAvocat.fullName} créé avec mot de passe opérationnel !`);
+            }
+            logActivity('Ajout', 'Collaborateurs', `Création du profil de l'avocat ${newAvocat.fullName} (${newAvocat.cabinetStatus})`, payload);
+        } catch (err) {
+            triggerToast('error', "Erreur d'enregistrement de l'avocat.");
+            if (accountAlreadyCreated) throw err;
+        }
+    };
+
+    const handleAddPersonnel = async (newPersonnel: Personnel, password?: string, accountAlreadyCreated = false) => {
+        const email = newPersonnel.email ? newPersonnel.email.trim().toLowerCase() : '';
+        const cleanPassword = (password || '').trim();
+        const isOfficePersonnel = newPersonnel.category === 'Office';
+        let userProvisioningError: unknown;
+
+        if (email) {
+            if (!accountAlreadyCreated) {
+                try {
+                    const existingUser = usersList.find(u => (u.email || '').trim().toLowerCase() === email);
+                    if (!existingUser) {
+                        await createNewUser({
+                            email: email,
+                            fullName: newPersonnel.fullName,
+                            userType: 'Personnel',
+                            personnelCategory: (newPersonnel.category as PersonnelCategory) || 'Administratif',
+                            functionRole: newPersonnel.role || 'Personnel',
+                            phone: newPersonnel.phone || '',
+                            hasAppAccess: !isOfficePersonnel,
+                            permissions: !isOfficePersonnel ? DEFAULT_ROLE_PERMISSIONS.Personnel : [],
+                            linkedEntityId: newPersonnel.id,
+                            password: isOfficePersonnel ? undefined : cleanPassword
+                        });
+                    } else {
+                        await updateAppUser(existingUser.id, {
+                            fullName: newPersonnel.fullName,
+                            linkedEntityId: newPersonnel.id
+                        });
+                    }
+                } catch (uErr) {
+                    console.error("Could not save personnel to users collection:", uErr);
+                    userProvisioningError = uErr;
+                }
             }
 
         }
 
-        setPersonnels(prev => [...prev, newPersonnel]);
         try {
             const { id, ...cleanPersonnel } = newPersonnel;
             await dbCreateDoc('personnels', id, cleanPersonnel);
-            triggerToast('success', `Agent administratif "${newPersonnel.fullName}" enregistré avec accès opérationnel !`);
+            setPersonnels(prev => prev.some(personnel => personnel.id === id) ? prev : [...prev, newPersonnel]);
+            if (userProvisioningError) {
+                triggerToast('error', `La fiche du membre du personnel est enregistrée, mais son compte utilisateur n'a pas pu être créé : ${userProvisioningError instanceof Error ? userProvisioningError.message : 'erreur inconnue'}`);
+            } else if (!accountAlreadyCreated) {
+                triggerToast('success', `Agent administratif "${newPersonnel.fullName}" enregistré avec accès opérationnel !`);
+            }
             logActivity('Ajout', 'Personnel', `Création de la fiche de l'agent administratif "${newPersonnel.fullName}" (${newPersonnel.role})`, cleanPersonnel);
         } catch (err) {
             triggerToast('error', "Erreur lors de l'inscription du membre du personnel.");
+            if (accountAlreadyCreated) throw err;
         }
     };
 

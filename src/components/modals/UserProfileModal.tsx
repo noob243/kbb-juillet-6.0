@@ -1,11 +1,11 @@
 import React, { FC, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
 import { updatePassword, updateProfile, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { doc, writeBatch } from 'firebase/firestore';
 import { AppUser } from '../../types/rbac';
 import { Avocat, Personnel } from '../../types';
-import { updateAppUser } from '../../services/userService';
-import { dbUpdateDoc } from '../../lib/firestoreService';
+import { getAuthenticatedUserByEmail } from '../../services/userService';
 import { compressAndOptimizeImage, validateImageFile, ACCEPTED_IMAGE_INPUT_ACCEPT } from '../../utils/imageOptimizer';
 
 interface UserProfileModalProps {
@@ -105,51 +105,52 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
 
     setIsSavingInfo(true);
     try {
-      const targetEmail = (email || currentUserObj?.email || currentUserInfo?.email || '').trim().toLowerCase();
+      const authenticatedEmail = auth.currentUser?.email;
+      if (!authenticatedEmail) {
+        throw new Error('Une session authentifiée est requise pour modifier le profil.');
+      }
+      const profile = await getAuthenticatedUserByEmail(authenticatedEmail);
+      if (!profile) {
+        throw new Error('Votre profil utilisateur est introuvable. Contactez un administrateur.');
+      }
 
-      // 1. Identify or match target user ID in Firestore
-      let targetUserId = currentUserObj?.id;
-      if (!targetUserId || targetUserId === 'admin-default') {
-        const found = usersList.find(u => (u.email || '').trim().toLowerCase() === targetEmail);
-        if (found?.id) {
-          targetUserId = found.id;
-        } else {
-          targetUserId = `user_${Date.now()}`;
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', profile.id), {
+        fullName: fullName.trim(),
+        phone: phone.trim(),
+        photoUrl,
+        updatedAt: new Date().toISOString()
+      });
+
+      if (profile.userType === 'Avocat') {
+        const targetEmail = profile.email.trim().toLowerCase();
+        const avocatMatch = avocats.find(avocat => avocat.id === profile.linkedEntityId)
+          || avocats.find(avocat => avocat.emails?.some(
+            candidate => (candidate || '').trim().toLowerCase() === targetEmail
+          ));
+        if (avocatMatch) {
+          batch.update(doc(db, 'avocats', avocatMatch.id), {
+            fullName: fullName.trim(),
+            phone: phone.trim(),
+            photoUrl
+          });
+        }
+      } else {
+        const targetEmail = profile.email.trim().toLowerCase();
+        const personnelMatch = personnels.find(personnel => personnel.id === profile.linkedEntityId)
+          || personnels.find(personnel => (personnel.email || '').trim().toLowerCase() === targetEmail);
+        if (personnelMatch) {
+          batch.update(doc(db, 'personnels', personnelMatch.id), {
+            fullName: fullName.trim(),
+            phone: phone.trim(),
+            photoUrl
+          });
         }
       }
 
-      // Update Firestore 'users' collection
-      await updateAppUser(targetUserId, {
-        fullName: fullName.trim(),
-        phone: phone.trim(),
-        photoUrl: photoUrl
-      });
+      await batch.commit();
 
-      // 2. Also update 'avocats' collection if matching lawyer exists
-      const avocatMatch = avocats.find(a => 
-        a.emails && a.emails.some(e => (e || '').trim().toLowerCase() === targetEmail)
-      );
-      if (avocatMatch?.id) {
-        await dbUpdateDoc('avocats', avocatMatch.id, {
-          fullName: fullName.trim(),
-          phone: phone.trim(),
-          photoUrl: photoUrl
-        });
-      }
-
-      // 3. Also update 'personnels' collection if matching staff exists
-      const personnelMatch = personnels.find(p => 
-        p.email && (p.email || '').trim().toLowerCase() === targetEmail
-      );
-      if (personnelMatch?.id) {
-        await dbUpdateDoc('personnels', personnelMatch.id, {
-          fullName: fullName.trim(),
-          phone: phone.trim(),
-          photoUrl: photoUrl
-        });
-      }
-
-      // 4. Update Firebase Auth display name safely without passing base64 photoURL (bypassing Firebase Auth size limit)
+      // 1. Update Firebase Auth display name without sending a base64 photo URL.
       if (auth.currentUser) {
         try {
           await updateProfile(auth.currentUser, {
@@ -160,7 +161,7 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
         }
       }
 
-      // 5. Notify parent app to update active session state
+      // 2. Notify parent app to update active session state.
       if (onUpdateSuccess) {
         onUpdateSuccess(fullName.trim(), photoUrl);
       }
@@ -210,14 +211,7 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
       const user = auth.currentUser;
 
       if (!user) {
-        // Fallback simulated password update if standard auth is mocked
-        setSuccessMsg('Nouveau mot de passe enregistré pour votre session.');
-        if (onAddToast) onAddToast('success', 'Mot de passe modifié avec succès.');
-        setNewPassword('');
-        setConfirmPassword('');
-        setCurrentPassword('');
-        setIsChangingPassword(false);
-        return;
+        throw new Error('Aucune session Firebase active. Reconnectez-vous avant de modifier le mot de passe.');
       }
 
       // If user is logged in with Firebase Auth, try updating

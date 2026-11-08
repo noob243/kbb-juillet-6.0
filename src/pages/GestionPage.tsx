@@ -20,6 +20,7 @@ import { exportListToPdf, exportElementToPdf } from '../utils/pdfExport';
 import { recentFirst } from '../utils/recentFirst';
 
 interface GestionPageProps {
+    users?: AppUser[];
     clients: Client[];
     cases: Case[];
     events: Event[];
@@ -30,8 +31,8 @@ interface GestionPageProps {
     fournisseurs: Fournisseur[];
     currentUser?: AppUser | null;
     onAddToast?: (type: 'success' | 'error', message: string) => void;
-    onAddAvocat?: (avocat: Avocat, password?: string) => void;
-    onAddPersonnel?: (personnel: Personnel, password?: string) => void;
+    onAddAvocat?: (avocat: Avocat, password?: string, accountAlreadyCreated?: boolean) => void | Promise<void>;
+    onAddPersonnel?: (personnel: Personnel, password?: string, accountAlreadyCreated?: boolean) => void | Promise<void>;
     onDeleteClient: (id: string | number) => void;
     onDeleteCase: (id: string) => void;
     onDeleteAvocat: (id: string) => void;
@@ -67,6 +68,8 @@ const GestionPage: FC<GestionPageProps> = (props) => {
 
     // Synchronized Users (RBAC) with Firestore
     const [usersList, setUsersList] = useState<AppUser[]>([]);
+    const [usersSyncError, setUsersSyncError] = useState<string | null>(null);
+    const effectiveUsersList = (props.users && props.users.length > 0) ? props.users : usersList;
 
     const refreshUsers = () => {
         // Real-time listener automatically handles user list updates
@@ -76,7 +79,12 @@ const GestionPage: FC<GestionPageProps> = (props) => {
         let active = true;
         let unsub: (() => void) | undefined;
         syncUsersWithFirestore((latest) => {
-            if (active) setUsersList(latest);
+            if (active) {
+                setUsersList(latest);
+                setUsersSyncError(null);
+            }
+        }, (error) => {
+            if (active) setUsersSyncError(error.message);
         }).then(cleanup => {
             if (!active) {
                 cleanup();
@@ -552,8 +560,13 @@ const GestionPage: FC<GestionPageProps> = (props) => {
 
             {mainAdminTab === 'users' && (
                 <div className="max-w-5xl mb-10">
+                    {usersSyncError && (
+                        <div role="alert" className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+                            Impossible de charger les utilisateurs depuis Firestore : {usersSyncError}
+                        </div>
+                    )}
                     <UserManagementTab
-                        users={usersList}
+                        users={effectiveUsersList}
                         currentUser={props.currentUser}
                         onRefreshUsers={refreshUsers}
                         onAddToast={(type, msg) => props.onAddToast ? props.onAddToast(type, msg) : alert(msg)}

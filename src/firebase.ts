@@ -37,19 +37,19 @@ export function getSecondaryAuth() {
 
 export async function createAuthAccountIfPossible(email: string, password?: string): Promise<{ success: boolean; error?: string }> {
   if (!email || !password || password.length < 12) return { success: false, error: 'Le mot de passe doit contenir au moins 12 caractères.' };
+  const secAuth = getSecondaryAuth();
   try {
-    const secAuth = getSecondaryAuth();
     const credential = await createUserWithEmailAndPassword(secAuth, email.trim(), password);
     await sendEmailVerification(credential.user);
-    await signOut(secAuth);
     return { success: true };
   } catch (err: any) {
     if (err.code === 'auth/email-already-in-use') {
       return { success: true, error: 'email-already-in-use' };
     }
     return { success: false, error: err.message || String(err) };
+  } finally {
+    if (secAuth.currentUser) await signOut(secAuth);
   }
 }
 
 export { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, signInWithPopup };
-

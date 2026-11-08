@@ -1,9 +1,18 @@
 import { AppUser, CreateUserPayload, UserRole, PersonnelCategory } from '../types/rbac';
 import { DEFAULT_ROLE_PERMISSIONS } from './rbacService';
 import { db, createAuthAccountIfPossible } from '../firebase';
-import { collection, doc, setDoc, updateDoc, onSnapshot, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, getDoc, onSnapshot, getDocs, query, where, limit, runTransaction, writeBatch } from 'firebase/firestore';
 import { sanitizeForFirestore } from '../lib/firestoreService';
-import { auth } from '../firebase';
+import { auth, functions } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+
+function getUserDocumentId(email: string): string {
+  let hash = 14695981039346656037n;
+  for (const byte of new TextEncoder().encode(email)) {
+    hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 1099511628211n);
+  }
+  return `user_${hash.toString(16).padStart(16, '0')}`;
+}
 
 export async function getAuthenticatedUserByEmail(email: string): Promise<AppUser | null> {
   const cleanEmail = email.trim().toLowerCase();
@@ -18,10 +27,13 @@ export async function getAuthenticatedUserByEmail(email: string): Promise<AppUse
   const userDocument = userSnapshot.docs[0];
   if (!userDocument) return null;
   const user = userDocument.data() as AppUser;
-  return { ...user, id: user.id || userDocument.id };
+  return { ...user, id: userDocument.id };
 }
 
-export async function syncUsersWithFirestore(onUpdate: (users: AppUser[]) => void): Promise<() => void> {
+export async function syncUsersWithFirestore(
+  onUpdate: (users: AppUser[]) => void,
+  onError?: (error: Error) => void
+): Promise<() => void> {
   const usersRef = collection(db, 'users');
   if (!auth.currentUser) {
     onUpdate([]);
@@ -31,12 +43,12 @@ export async function syncUsersWithFirestore(onUpdate: (users: AppUser[]) => voi
     const remoteUsers: AppUser[] = [];
     snapshot.forEach(docSnap => {
       const user = docSnap.data() as AppUser;
-      remoteUsers.push({ ...user, id: user.id || docSnap.id });
+      remoteUsers.push({ ...user, id: docSnap.id });
     });
     onUpdate(remoteUsers);
   }, (error) => {
     console.error("Users subscription failed:", error);
-    onUpdate([]);
+    onError?.(error);
   });
 
   return unsub;
@@ -44,7 +56,18 @@ export async function syncUsersWithFirestore(onUpdate: (users: AppUser[]) => voi
 
 export async function createNewUser(payload: CreateUserPayload): Promise<AppUser> {
   const now = new Date().toISOString();
-  const newId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+  const email = payload.email.trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Une adresse e-mail valide est requise.');
+  }
+
+  const newId = getUserDocumentId(email);
+  const existingUsers = await getDocs(collection(db, 'users'));
+  if (existingUsers.docs.some(userDoc =>
+    String(userDoc.data().email || '').trim().toLowerCase() === email
+  )) {
+    throw new Error('Un profil utilisateur existe déjà pour cette adresse e-mail.');
+  }
   
   const isOfficePersonnel = payload.userType === 'Personnel' && payload.personnelCategory === 'Office';
   const hasAppAccess = payload.hasAppAccess !== undefined ? payload.hasAppAccess : !isOfficePersonnel;
@@ -54,7 +77,7 @@ export async function createNewUser(payload: CreateUserPayload): Promise<AppUser
 
   const newUser: AppUser = {
     id: newId,
-    email: payload.email.trim().toLowerCase(),
+    email,
     fullName: payload.fullName.trim(),
     role: role,
     userType: payload.userType,
@@ -82,7 +105,17 @@ export async function createNewUser(payload: CreateUserPayload): Promise<AppUser
   }
 
   const cleanData = sanitizeForFirestore(newUser);
-  await setDoc(doc(db, 'users', newUser.id), cleanData);
+  await runTransaction(db, async (transaction) => {
+    const userRef = doc(db, 'users', newUser.id);
+    const existingUser = await transaction.get(userRef);
+    if (existingUser.exists()) {
+      const existingEmail = String(existingUser.data().email || '').trim().toLowerCase();
+      throw new Error(existingEmail === email
+        ? 'Un profil utilisateur existe déjà pour cette adresse e-mail.'
+        : 'Identifiant utilisateur en conflit. Contactez un administrateur.');
+    }
+    transaction.set(userRef, cleanData);
+  });
 
   return newUser;
 }
@@ -141,17 +174,43 @@ export async function syncAvocatsAndPersonnelsToUsers(
 }
 
 export async function updateAppUser(userId: string, updates: Partial<AppUser>): Promise<void> {
-  const now = new Date().toISOString();
-  const userRef = doc(db, 'users', userId);
-
   try {
-    const finalSet = sanitizeForFirestore({ ...updates, updatedAt: now });
-
-    await setDoc(userRef, finalSet, { merge: true });
+    await updateAppUserAndLinkedRecord(userId, updates);
   } catch (err) {
     console.error("Failed to update user in Firestore:", err);
     throw err;
   }
+}
+
+export async function updateAppUserAndLinkedRecord(
+  userId: string,
+  updates: Partial<AppUser>,
+  linkedRecord?: {
+    collectionName: 'avocats' | 'personnels';
+    id: string;
+    updates: Record<string, unknown>;
+  }
+): Promise<void> {
+  const userRef = doc(db, 'users', userId);
+  if (updates.email !== undefined) {
+    const currentUser = await getDoc(userRef);
+    if (!currentUser.exists()) throw new Error('Le profil utilisateur est introuvable.');
+    const currentData = currentUser.data() as AppUser;
+    if ((currentData.authUid || currentData.hasAppAccess !== false)
+      && updates.email.trim().toLowerCase() !== (currentData.email || '').trim().toLowerCase()) {
+      throw new Error('L’adresse e-mail de connexion ne peut pas être modifiée depuis ce formulaire.');
+    }
+  }
+
+  const batch = writeBatch(db);
+  batch.set(userRef, sanitizeForFirestore({ ...updates, updatedAt: new Date().toISOString() }), { merge: true });
+  if (linkedRecord) {
+    batch.update(
+      doc(db, linkedRecord.collectionName, linkedRecord.id),
+      sanitizeForFirestore(linkedRecord.updates)
+    );
+  }
+  await batch.commit();
 }
 
 export async function softDeleteUser(userId: string): Promise<void> {
@@ -161,6 +220,11 @@ export async function softDeleteUser(userId: string): Promise<void> {
     status: 'Archivé',
     updatedAt: now
   });
+}
+
+export async function hardDeleteUser(userId: string): Promise<void> {
+  const deleteManagedUser = httpsCallable(functions, 'deleteManagedUser');
+  await deleteManagedUser({ userId });
 }
 
 export async function restoreUser(userId: string): Promise<void> {
