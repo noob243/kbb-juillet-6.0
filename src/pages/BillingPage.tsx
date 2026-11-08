@@ -13,10 +13,10 @@ import PaginationControls from '../components/common/PaginationControls';
 import { recentFirst } from '../utils/recentFirst';
 
 interface BillingPageProps {
-  invoices: Invoice[];
+  invoices?: Invoice[];
   dataError?: string | null;
-  cases: Case[];
-  clients: Client[];
+  cases?: Case[];
+  clients?: Client[];
   avocats?: Avocat[];
   users?: AppUser[];
   currentUserInfo?: { name: string; role: string; email: string; functionRole?: string } | null;
@@ -26,10 +26,14 @@ interface BillingPageProps {
   onNavigate?: (pageName: string, query?: string) => void;
 }
 
-const BillingPage: FC<BillingPageProps> = ({ invoices, dataError, cases, clients = [], avocats = [], users = [], currentUserInfo, currentUser, onAddInvoice, onSendEmail, onNavigate }) => {
+const BillingPage: FC<BillingPageProps> = ({ invoices = [], dataError, cases = [], clients = [], avocats = [], users = [], currentUserInfo, currentUser, onAddInvoice, onSendEmail, onNavigate }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDetailInvoice, setSelectedDetailInvoice] = useState<Invoice | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const safeInvoices = Array.isArray(invoices) ? invoices : [];
+    const safeCases = Array.isArray(cases) ? cases : [];
+    const safeClients = Array.isArray(clients) ? clients : [];
 
     const canAccessCases = hasPermission(currentUser, 'cases');
     const canAccessClients = hasPermission(currentUser, 'clients');
@@ -62,8 +66,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, dataError, cases, clients
         return 'Non réglée';
     };
 
-    // Firestore already limits this collection to users with the billing permission.
-    const billingInvoices = invoices.map(invoice => {
+    const billingInvoices = safeInvoices.map(invoice => {
         const amounts = getInvoiceAmounts(invoice);
         return {
             ...invoice,
@@ -80,7 +83,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, dataError, cases, clients
 
     // Filter invoices by search query
     const filteredInvoices = recentFirst<Invoice>(billingInvoices.filter(invoice => {
-        const relatedCase = cases.find(c => c.id === invoice.caseId);
+        const relatedCase = safeCases.find(c => c.id === invoice.caseId);
         const searchTarget = `${invoice.id} ${invoice.status} ${invoice.dueDate} ${invoice.etiquette || ''} ${relatedCase ? relatedCase.name : ''}`.toLowerCase();
         return searchTarget.includes(searchQuery.toLowerCase());
     }));
@@ -372,7 +375,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, dataError, cases, clients
                                     </tr>
                                 ) : (
                                     pagination.visibleItems.map(invoice => {
-                                        const relatedCase = cases.find(c => c.id === invoice.caseId);
+                                        const relatedCase = safeCases.find(c => c.id === invoice.caseId);
                                         const amounts = getInvoiceAmounts(invoice);
                                         const invoiceStatus = getInvoiceStatus(invoice);
                                         return (
@@ -450,9 +453,9 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, dataError, cases, clients
                                                         </button>
                                                         <button
                                                             onClick={() => {
-                                                                const currentCase = cases.find(c => (c.id || '').toLowerCase() === (invoice.caseId || '').toLowerCase());
+                                                                const currentCase = safeCases.find(c => (c.id || '').toLowerCase() === (invoice.caseId || '').toLowerCase());
                                                                 const clientName = currentCase ? currentCase.client : '';
-                                                                const currentClient = clients.find(cl => (cl.name || '').toLowerCase() === (clientName || '').toLowerCase());
+                                                                const currentClient = safeClients.find(cl => (cl.name || '').toLowerCase() === (clientName || '').toLowerCase());
                                                                 const clientEmail = currentClient?.email || `${(clientName || 'client').toLowerCase().replace(/\s+/g, '.')}@entreprise.cd`;
                                                                 
                                                                 const subject = `📥 KBB Law Firm scp / Transmission Facture N° ${invoice.id}`;

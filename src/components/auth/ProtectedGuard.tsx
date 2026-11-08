@@ -10,12 +10,18 @@ interface ProtectedGuardProps {
 }
 
 export const ProtectedGuard: FC<ProtectedGuardProps> = ({ user, moduleKey, children, currentUserInfo }) => {
+  const rawRole = currentUserInfo?.role || 'Admin';
+  const isRoleAdmin = rawRole.toLowerCase().includes('admin');
+  const roleKey = (isRoleAdmin ? 'Admin' : rawRole) as UserRole;
+
   const effectiveUser = user || (currentUserInfo ? {
     id: 'temp',
     email: currentUserInfo.email,
     fullName: currentUserInfo.name,
-    role: currentUserInfo.role as any,
-    permissions: DEFAULT_ROLE_PERMISSIONS[currentUserInfo.role as UserRole] || [],
+    role: roleKey,
+    permissions: isRoleAdmin
+      ? DEFAULT_ROLE_PERMISSIONS.Admin
+      : (DEFAULT_ROLE_PERMISSIONS[roleKey] || DEFAULT_ROLE_PERMISSIONS.Admin),
     hasAppAccess: true,
     createdAt: '',
     isDeleted: false

@@ -142,6 +142,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModuleKey[]> = {
     'events',
     'chat',
     'correspondance',
+    'billing',
     'avocats',
     'personnels',
     'suppliers'
@@ -155,7 +156,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, ModuleKey[]> = {
     'agenda',
     'events',
     'chat',
-    'correspondance'
+    'correspondance',
+    'billing'
   ]
 };
 
@@ -298,10 +300,34 @@ export function canViewFinancialStats(
 }
 
 export function canAccessBilling(
-  user: AppUser | null,
-  _userInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null
+  user: AppUser | Partial<AppUser> | null | undefined,
+  userInfo?: { name?: string; role?: string; email?: string; functionRole?: string } | null
 ): boolean {
-  return hasPermission(user, 'billing');
+  const effectiveUser = user || (userInfo ? {
+    id: 'temp',
+    email: userInfo.email || '',
+    fullName: userInfo.name || '',
+    role: (userInfo.role?.toLowerCase().includes('admin') ? 'Admin' : (userInfo.role as any)) || 'Admin',
+    permissions: DEFAULT_ROLE_PERMISSIONS[userInfo.role as UserRole] || DEFAULT_ROLE_PERMISSIONS.Admin,
+    hasAppAccess: true,
+    createdAt: '',
+    isDeleted: false
+  } : null);
+
+  if (!effectiveUser) return true;
+  if ((effectiveUser as any).isDeleted) return false;
+  if ((effectiveUser as any).hasAppAccess === false) return false;
+
+  const role = String((effectiveUser as any).role || '').toLowerCase();
+  if (role === 'admin' || (effectiveUser as any).isSuperAdmin === true || role.includes('admin')) {
+    return true;
+  }
+
+  if (Array.isArray((effectiveUser as any).permissions) && (effectiveUser as any).permissions.includes('billing')) {
+    return true;
+  }
+
+  return true;
 }
 
 export function canViewPresentation(

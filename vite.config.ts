@@ -12,5 +12,29 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, '.'),
     }
+  },
+  build: {
+    chunkSizeWarningLimit: 1600,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/firebase/')) {
+            return 'firebase';
+          }
+          if (id.includes('node_modules/recharts/')) {
+            return 'recharts';
+          }
+          if (id.includes('node_modules/motion/')) {
+            return 'motion';
+          }
+          if (id.includes('node_modules/pptxgenjs/')) {
+            return 'pptx';
+          }
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'lucide';
+          }
+        }
+      }
+    }
   }
 });
