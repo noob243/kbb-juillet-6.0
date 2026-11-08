@@ -3,10 +3,15 @@ const { onSchedule } = require('firebase-functions/v2/scheduler');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const admin = require('firebase-admin');
+const { getAuth } = require('firebase-admin/auth');
+const { FieldValue, getFirestore } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 
-admin.initializeApp();
+const app = admin.initializeApp();
 
+const FIRESTORE_DATABASE_ID = 'ai-studio-kbbappjuin-5d1bdf63-f454-4325-bd12-e80af9246ebc';
+const auth = getAuth(app);
+const firestore = getFirestore(app, FIRESTORE_DATABASE_ID);
 const GEMINI_API_KEY = defineSecret('GEMINI_API_KEY');
 const SMTP_USER = defineSecret('SMTP_USER');
 const SMTP_PASS = defineSecret('SMTP_PASS');
@@ -27,20 +32,20 @@ async function revokeUserAccess({ uid, email }) {
   let authUser;
   if (typeof uid === 'string' && uid) {
     try {
-      authUser = await admin.auth().getUser(uid);
+      authUser = await auth.getUser(uid);
     } catch (error) {
       if (error.code !== 'auth/user-not-found') throw error;
     }
   }
   if (!authUser && typeof email === 'string' && email.trim()) {
     try {
-      authUser = await admin.auth().getUserByEmail(email.trim().toLowerCase());
+      authUser = await auth.getUserByEmail(email.trim().toLowerCase());
     } catch (error) {
       if (error.code !== 'auth/user-not-found') throw error;
     }
   }
   if (authUser) {
-    await admin.auth().setCustomUserClaims(authUser.uid, {
+    await auth.setCustomUserClaims(authUser.uid, {
       appAccess: false,
       isDeleted: true,
       permissions: []
@@ -68,7 +73,10 @@ function claimsForProfile(profile) {
   };
 }
 
-exports.syncUserClaims = onDocumentWritten('users/{userId}', async (event) => {
+exports.syncUserClaims = onDocumentWritten({
+  document: 'users/{userId}',
+  database: FIRESTORE_DATABASE_ID
+}, async (event) => {
   const after = event.data?.after;
   const before = event.data?.before;
   if (!after?.exists) {
@@ -92,13 +100,13 @@ exports.syncUserClaims = onDocumentWritten('users/{userId}', async (event) => {
   }
 
   try {
-    const authUser = await admin.auth().getUserByEmail(email);
-    await admin.auth().setCustomUserClaims(authUser.uid, claimsForProfile(profile));
+    const authUser = await auth.getUserByEmail(email);
+    await auth.setCustomUserClaims(authUser.uid, claimsForProfile(profile));
     if (profile.authUid !== authUser.uid || 'password' in profile || 'tempPassword' in profile) {
       await after.ref.update({
         authUid: authUser.uid,
-        password: admin.firestore.FieldValue.delete(),
-        tempPassword: admin.firestore.FieldValue.delete()
+        password: FieldValue.delete(),
+        tempPassword: FieldValue.delete()
       });
     }
   } catch (error) {
@@ -114,7 +122,7 @@ exports.resolveAuthenticatedUserProfile = onCall(async (request) => {
   }
 
   const email = tokenEmail.trim().toLowerCase();
-  const usersRef = admin.firestore().collection('users');
+  const usersRef = firestore.collection('users');
   let matches = await usersRef.where('email', '==', email).limit(2).get();
   let profileDocs = matches.docs;
   if (matches.empty) {
@@ -138,17 +146,17 @@ exports.resolveAuthenticatedUserProfile = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'Ce profil est déjà associé à un autre compte. Contactez un administrateur.');
   }
 
-  const authUser = await admin.auth().getUser(uid);
+  const authUser = await auth.getUser(uid);
   if (!authUser.emailVerified || authUser.email?.trim().toLowerCase() !== email) {
     throw new HttpsError('permission-denied', 'Une adresse e-mail vérifiée correspondant au profil est requise.');
   }
 
-  await admin.auth().setCustomUserClaims(uid, claimsForProfile(profile));
+  await auth.setCustomUserClaims(uid, claimsForProfile(profile));
   if (profile.authUid !== uid || 'password' in profile || 'tempPassword' in profile) {
     await profileDoc.ref.update({
       authUid: uid,
-      password: admin.firestore.FieldValue.delete(),
-      tempPassword: admin.firestore.FieldValue.delete()
+      password: FieldValue.delete(),
+      tempPassword: FieldValue.delete()
     });
   }
 
@@ -235,6 +243,7 @@ exports.generateAIResponse = onCall({ secrets: [GEMINI_API_KEY], timeoutSeconds:
  */
 exports.sendTaskReminder24h = onDocumentWritten({
   document: 'tasks/{taskId}',
+  database: FIRESTORE_DATABASE_ID,
   secrets: [SMTP_USER, SMTP_PASS]
 }, async (event) => {
   const snapshot = event.data;
@@ -251,7 +260,7 @@ exports.sendTaskReminder24h = onDocumentWritten({
     return;
   }
 
-  const assignedUsers = await admin.firestore().collection('users')
+  const assignedUsers = await firestore.collection('users')
     .where('email', '==', assigneeEmail)
     .limit(1)
     .get();
@@ -319,11 +328,10 @@ exports.sendTaskReminder24h = onDocumentWritten({
  * Hourly Cron Schedule Function: Checks tasks due in 24 hours
  */
 exports.checkScheduledTaskReminders = onSchedule('every 1 hours', async () => {
-  const db = admin.firestore();
   const now = new Date();
 
   try {
-    const snapshot = await db.collection('tasks')
+    const snapshot = await firestore.collection('tasks')
       .where('emailReminder24h', '==', true)
       .where('emailReminderSent', '!=', true)
       .get();
