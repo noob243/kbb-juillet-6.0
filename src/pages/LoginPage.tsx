@@ -1,8 +1,9 @@
 
 import React, { FC, useState } from 'react';
 import { Eye, EyeOff, Lock, Mail, ShieldCheck } from 'lucide-react';
-import { auth } from '../firebase';
+import { auth, functions } from '../firebase';
 import { sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import { getAuthenticatedUserByEmail } from '../services/userService';
 import { AppUser } from '../types/rbac';
 
@@ -55,6 +56,9 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 return;
             }
 
+            await credential.user.getIdToken(true);
+            const resolveProfile = httpsCallable(functions, 'resolveAuthenticatedUserProfile');
+            await resolveProfile();
             const token = await credential.user.getIdTokenResult(true);
             if (token.claims.appAccess !== true || token.claims.isDeleted === true) {
                 await signOut(auth);
@@ -72,10 +76,14 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
             onLoginSuccess(user);
         } catch (err: any) {
             console.error("Login attempt failed:", err?.code || err);
+            const errorCode = String(err?.code || '');
+            const functionError = errorCode.startsWith('functions/');
             setErrorMsg(
-                err?.code === 'auth/invalid-credential' || err?.code === 'auth/user-not-found'
+                errorCode === 'auth/invalid-credential' || errorCode === 'auth/user-not-found'
                     ? 'Adresse e-mail ou mot de passe incorrect.'
-                    : 'Impossible de se connecter. Vérifiez vos identifiants et réessayez.'
+                    : functionError
+                        ? err?.message || 'Impossible de vérifier les droits de ce compte. Contactez un administrateur.'
+                        : 'Impossible de se connecter. Vérifiez vos identifiants et réessayez.'
             );
         } finally {
             setIsLoading(false);

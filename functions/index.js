@@ -48,6 +48,26 @@ async function revokeUserAccess({ uid, email }) {
   }
 }
 
+function claimsForProfile(profile) {
+  const permissions = Array.isArray(profile.permissions)
+    ? profile.permissions.filter(permission => ALLOWED_PERMISSIONS.has(permission))
+    : [];
+  const isAdmin = profile.role === 'Admin';
+
+  return {
+    role: isAdmin ? 'Admin' : profile.role === 'Avocat' ? 'Avocat' : 'Personnel',
+    fullName: typeof profile.fullName === 'string' ? profile.fullName.slice(0, 120) : '',
+    functionRole: typeof profile.functionRole === 'string' ? profile.functionRole.slice(0, 120) : '',
+    appAccess: profile.status === 'Actif'
+      && profile.isDeleted !== true
+      && profile.hasAppAccess !== false
+      && profile.personnelCategory !== 'Office',
+    isDeleted: profile.isDeleted === true || profile.status !== 'Actif',
+    permissions: isAdmin ? [...ALLOWED_PERMISSIONS] : permissions,
+    canDelete: isAdmin || profile.canDelete === true || permissions.includes('can_delete')
+  };
+}
+
 exports.syncUserClaims = onDocumentWritten('users/{userId}', async (event) => {
   const after = event.data?.after;
   const before = event.data?.before;
@@ -71,28 +91,9 @@ exports.syncUserClaims = onDocumentWritten('users/{userId}', async (event) => {
     await revokeUserAccess({ uid: previousProfile.authUid, email: previousProfile.email });
   }
 
-  const hasAccess = profile.status === 'Actif'
-    && profile.isDeleted !== true
-    && profile.hasAppAccess !== false
-    && profile.personnelCategory !== 'Office';
-
   try {
     const authUser = await admin.auth().getUserByEmail(email);
-    const permissions = Array.isArray(profile.permissions)
-      ? profile.permissions.filter(permission => ALLOWED_PERMISSIONS.has(permission))
-      : [];
-    const claims = {
-      role: profile.role === 'Admin' ? 'Admin' : profile.role === 'Avocat' ? 'Avocat' : 'Personnel',
-      fullName: typeof profile.fullName === 'string' ? profile.fullName.slice(0, 120) : '',
-      functionRole: typeof profile.functionRole === 'string' ? profile.functionRole.slice(0, 120) : '',
-      appAccess: hasAccess,
-      isDeleted: profile.isDeleted === true || profile.status !== 'Actif',
-      permissions: profile.role === 'Admin' ? [...ALLOWED_PERMISSIONS] : permissions,
-      canDelete: profile.role === 'Admin'
-        || profile.canDelete === true
-        || permissions.includes('can_delete')
-    };
-    await admin.auth().setCustomUserClaims(authUser.uid, claims);
+    await admin.auth().setCustomUserClaims(authUser.uid, claimsForProfile(profile));
     if (profile.authUid !== authUser.uid || 'password' in profile || 'tempPassword' in profile) {
       await after.ref.update({
         authUid: authUser.uid,
@@ -103,6 +104,55 @@ exports.syncUserClaims = onDocumentWritten('users/{userId}', async (event) => {
   } catch (error) {
     if (error.code !== 'auth/user-not-found') throw error;
   }
+});
+
+exports.resolveAuthenticatedUserProfile = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  const tokenEmail = request.auth?.token?.email;
+  if (!uid || request.auth?.token?.email_verified !== true || typeof tokenEmail !== 'string') {
+    throw new HttpsError('unauthenticated', 'Connectez-vous avec une adresse e-mail vérifiée.');
+  }
+
+  const email = tokenEmail.trim().toLowerCase();
+  const usersRef = admin.firestore().collection('users');
+  let matches = await usersRef.where('email', '==', email).limit(2).get();
+  let profileDocs = matches.docs;
+  if (matches.empty) {
+    const allProfiles = await usersRef.get();
+    profileDocs = allProfiles.docs.filter(profileDoc =>
+        String(profileDoc.data().email || '').trim().toLowerCase() === email
+    ).slice(0, 2);
+  }
+
+  if (profileDocs.length !== 1) {
+    throw new HttpsError('failed-precondition', 'Le profil de ce compte est absent ou ambigu. Contactez un administrateur.');
+  }
+
+  const profileDoc = profileDocs[0];
+  const profile = profileDoc.data();
+  if (profile.status !== 'Actif' || profile.isDeleted === true
+    || profile.hasAppAccess === false || profile.personnelCategory === 'Office') {
+    throw new HttpsError('permission-denied', 'Ce compte ne dispose pas d’un accès actif à l’application.');
+  }
+  if (profile.authUid && profile.authUid !== uid) {
+    throw new HttpsError('permission-denied', 'Ce profil est déjà associé à un autre compte. Contactez un administrateur.');
+  }
+
+  const authUser = await admin.auth().getUser(uid);
+  if (!authUser.emailVerified || authUser.email?.trim().toLowerCase() !== email) {
+    throw new HttpsError('permission-denied', 'Une adresse e-mail vérifiée correspondant au profil est requise.');
+  }
+
+  await admin.auth().setCustomUserClaims(uid, claimsForProfile(profile));
+  if (profile.authUid !== uid || 'password' in profile || 'tempPassword' in profile) {
+    await profileDoc.ref.update({
+      authUid: uid,
+      password: admin.firestore.FieldValue.delete(),
+      tempPassword: admin.firestore.FieldValue.delete()
+    });
+  }
+
+  return { ok: true };
 });
 
 exports.generateAIResponse = onCall({ secrets: [GEMINI_API_KEY], timeoutSeconds: 60 }, async (request) => {
