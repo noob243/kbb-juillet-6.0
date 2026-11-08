@@ -10,7 +10,7 @@ interface MobileMenuProps {
     setMenuStyle: (style: 'grid' | 'tabbar') => void;
 }
 
-export const MobileMenuModal: FC<MobileMenuProps> = ({
+const MobileMenuModalComponent: FC<MobileMenuProps> = ({
     currentPage,
     setCurrentPage,
     isOpen,
@@ -153,7 +153,7 @@ export const MobileMenuModal: FC<MobileMenuProps> = ({
     );
 };
 
-export const MobileTabBar: FC<{
+const MobileTabBarComponent: FC<{
     currentPage: string;
     setCurrentPage: (page: string) => void;
     onOpenMenuGrid: () => void;
@@ -221,3 +221,6 @@ export const MobileTabBar: FC<{
         </div>
     );
 };
+
+export const MobileMenuModal = React.memo(MobileMenuModalComponent);
+export const MobileTabBar = React.memo(MobileTabBarComponent);

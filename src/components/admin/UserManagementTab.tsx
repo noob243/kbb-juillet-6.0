@@ -22,6 +22,7 @@ const BAR_OPTIONS = [
 
 interface UserManagementTabProps {
   users?: AppUser[];
+  usersLoading?: boolean;
   currentUser?: AppUser | null;
   onRefreshUsers?: () => void;
   onAddToast?: (type: 'success' | 'error', message: string) => void;
@@ -31,6 +32,7 @@ interface UserManagementTabProps {
 
 export const UserManagementTab: FC<UserManagementTabProps> = ({
   users = [],
+  usersLoading = false,
   currentUser = null,
   onRefreshUsers = () => {},
   onAddToast = (_type: string, _msg: string) => {},
@@ -409,6 +411,11 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
 
   return (
     <div className="space-y-6">
+      {usersLoading && (
+        <div role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-xs font-medium text-indigo-800">
+          Chargement des profils utilisateur en cours. {users.length} compte(s) déjà chargés.
+        </div>
+      )}
       {!userCanManageAccounts && (
         <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-800">
           La gestion et la modification des comptes sont réservées aux administrateurs. Les listes restent consultables selon vos autorisations.
@@ -443,7 +450,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
-          2. Modification & Profils ({activeUsers.length})
+          2. Modification & Profils ({usersLoading ? '…' : activeUsers.length})
         </button>
 
         <button
@@ -458,7 +465,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
-          3. Suppression & Archivage ({archivedUsers.length})
+          3. Suppression & Archivage ({usersLoading ? '…' : archivedUsers.length})
         </button>
       </div>
 

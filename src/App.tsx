@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -79,17 +79,19 @@ function App() {
     const [currentUserInfo, setCurrentUserInfo] = useState<{ name: string; role: string; email: string; photoUrl?: string } | null>(null);
     const [currentUserObj, setCurrentUserObj] = useState<AppUser | null>(null);
     const [usersList, setUsersList] = useState<AppUser[]>([]);
+    const [usersLoading, setUsersLoading] = useState(false);
+    const [usersSyncError, setUsersSyncError] = useState<string | null>(null);
     const [currentPage, setCurrentPage] = useState('Dashboard');
     const [pageHistory, setPageHistory] = useState<string[]>(['Dashboard']);
 
-    const handleNavigate = (page: string) => {
+    const handleNavigate = useCallback((page: string) => {
         if (page !== currentPage) {
             setPageHistory(prev => [...prev, page]);
             setCurrentPage(page);
         }
-    };
+    }, [currentPage]);
 
-    const handleGoBack = () => {
+    const handleGoBack = useCallback(() => {
         if (pageHistory.length > 1) {
             const newHistory = [...pageHistory];
             newHistory.pop();
@@ -97,7 +99,12 @@ function App() {
             setPageHistory(newHistory);
             setCurrentPage(prev);
         }
-    };
+    }, [pageHistory]);
+    const closeSidebar = useCallback(() => setIsSidebarOpen(false), []);
+    const openSidebar = useCallback(() => setIsSidebarOpen(true), []);
+    const openProfileModal = useCallback(() => setIsProfileModalOpen(true), []);
+    const openMobileMenu = useCallback(() => setIsMobileMenuOpen(true), []);
+    const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
     const [isInitialLoading, setIsInitialLoading] = useState(true);
 
     const [lastEventDoc, setLastEventDoc] = useState<any>(null);
@@ -232,15 +239,30 @@ function App() {
     useEffect(() => {
         if (!isAuthenticated) {
             setUsersList([]);
+            setUsersLoading(false);
+            setUsersSyncError(null);
             return;
         }
+        let active = true;
         let unsub: (() => void) | undefined;
-        syncUsersWithFirestore((latestUsers) => {
+        setUsersLoading(true);
+        setUsersSyncError(null);
+        syncUsersWithFirestore((latestUsers, isLoading) => {
+            if (!active) return;
             setUsersList(latestUsers);
+            setUsersLoading(isLoading);
+            setUsersSyncError(null);
+        }, (error) => {
+            if (active) {
+                setUsersSyncError(error.message);
+                setUsersLoading(false);
+            }
         }).then(cleanup => {
-            unsub = cleanup;
+            if (!active) cleanup();
+            else unsub = cleanup;
         });
         return () => {
+            active = false;
             if (unsub) unsub();
         };
     }, [isAuthenticated]);
@@ -254,13 +276,13 @@ function App() {
                     setCurrentUserInfo(prev => prev ? { ...prev, photoUrl: found.photoUrl, name: found.fullName || prev.name } : null);
                 }
                 setCurrentUserObj(found);
-            } else {
+            } else if (!usersLoading && !usersSyncError) {
                 setCurrentUserObj(null);
             }
         } else {
             setCurrentUserObj(null);
         }
-    }, [currentUserInfo?.email, usersList]);
+    }, [currentUserInfo?.email, usersList, usersLoading, usersSyncError]);
 
     // Real-time online presence heartbeat in Firestore with activity listener
     useEffect(() => {
@@ -277,8 +299,8 @@ function App() {
         // Mark online immediately
         sendPresenceUpdate();
 
-        // Heartbeat interval every 15 seconds
-        const heartbeat = setInterval(sendPresenceUpdate, 15000);
+        // Keep presence current without forcing frequent application-wide user list updates.
+        const heartbeat = setInterval(sendPresenceUpdate, 60000);
 
         // Throttle user interaction activity listener
         let lastActivityTime = Date.now();
@@ -988,7 +1010,7 @@ function App() {
         });
     };
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         if (currentUserInfo && currentUserInfo.email) {
             dbCreateAuditLog({
                 userEmail: currentUserInfo.email,
@@ -1014,7 +1036,7 @@ function App() {
         setCurrentUserObj(null);
         setCurrentPage('Dashboard');
         signOut(auth).catch(err => console.error('Unable to sign out from Firebase:', err));
-    };
+    }, [currentUserInfo]);
 
     const logActivity = async (
         actionType: 'Ajout' | 'Modification' | 'Suppression' | 'Connexion' | 'Autre',
@@ -1697,7 +1719,7 @@ function App() {
             case 'Avocats': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="avocats"><AvocatsPage avocats={avocats} tasks={tasks} onAddAvocat={handleAddAvocat} onDeleteAvocat={handleDeleteAvocat} onSendEmail={triggerEmail} correspondances={correspondances} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Personnels': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="personnels"><PersonnelsPage personnels={personnels} onAddPersonnel={handleAddPersonnel} onDeletePersonnel={handleDeletePersonnel} onSendEmail={triggerEmail} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
             case 'Fournisseurs': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="suppliers"><FournisseursPage fournisseurs={fournisseurs} onAddFournisseur={handleAddFournisseur} onDeleteFournisseur={handleDeleteFournisseur} onSendEmail={triggerEmail} currentUserInfo={currentUserInfo} currentUser={currentUserObj} /></ProtectedGuard>;
-            case 'Gestion': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="gestion_cabinet"><GestionPage {...pageProps} currentUser={currentUserObj} onSendEmail={triggerEmail} onAddToast={triggerToast} /></ProtectedGuard>;
+            case 'Gestion': return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="gestion_cabinet"><GestionPage {...pageProps} currentUser={currentUserObj} usersLoading={usersLoading} usersSyncError={usersSyncError} onSendEmail={triggerEmail} onAddToast={triggerToast} /></ProtectedGuard>;
             case 'AuditLogs':
             case 'Audit':
             case 'audit':
@@ -1726,7 +1748,7 @@ function App() {
 
     return (
         <div className="flex h-screen bg-gray-100 dark:bg-[#070b13] font-sans overflow-hidden transition-colors duration-300">
-            <Sidebar currentPage={currentPage} setCurrentPage={handleNavigate} onLogout={handleLogout} currentUserInfo={currentUserInfo} currentUser={currentUserObj} isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+            <Sidebar currentPage={currentPage} setCurrentPage={handleNavigate} onLogout={handleLogout} currentUserInfo={currentUserInfo} currentUser={currentUserObj} isOpen={isSidebarOpen} onClose={closeSidebar} />
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                 <Header 
                     searchQuery={searchQuery} 
@@ -1739,8 +1761,8 @@ function App() {
                     setIsDarkMode={setIsDarkMode}
                     currentUserInfo={currentUserInfo}
                     onLogout={handleLogout}
-                    onOpenProfileModal={() => setIsProfileModalOpen(true)}
-                    onMenuToggle={() => setIsSidebarOpen(true)}
+                    onOpenProfileModal={openProfileModal}
+                    onMenuToggle={openSidebar}
                     isDbConnected={isDbConnected}
                 />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 sm:pb-8 custom-scrollbar relative">
@@ -1752,7 +1774,7 @@ function App() {
             <MobileTabBar 
                 currentPage={currentPage} 
                 setCurrentPage={handleNavigate} 
-                onOpenMenuGrid={() => setIsMobileMenuOpen(true)} 
+                onOpenMenuGrid={openMobileMenu}
                 onBack={handleGoBack}
                 canGoBack={pageHistory.length > 1}
             />
@@ -1760,7 +1782,7 @@ function App() {
                 currentPage={currentPage}
                 setCurrentPage={handleNavigate}
                 isOpen={isMobileMenuOpen}
-                onClose={() => setIsMobileMenuOpen(false)}
+                onClose={closeMobileMenu}
                 menuStyle={menuStyle}
                 setMenuStyle={setMenuStyle}
             />

@@ -310,4 +310,27 @@ const Sidebar: FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout, curr
     );
 };
 
-export default Sidebar;
+const samePermissions = (left: AppUser['permissions'] = [], right: AppUser['permissions'] = []) =>
+    left.length === right.length && left.every((permission, index) => permission === right[index]);
+
+export default React.memo(Sidebar, (previous, next) => {
+    const previousUser = previous.currentUser;
+    const nextUser = next.currentUser;
+    const previousInfo = previous.currentUserInfo;
+    const nextInfo = next.currentUserInfo;
+
+    return previous.currentPage === next.currentPage
+        && previous.setCurrentPage === next.setCurrentPage
+        && previous.onLogout === next.onLogout
+        && previous.onClose === next.onClose
+        && (previous.isOpen ?? false) === (next.isOpen ?? false)
+        && previousInfo?.name === nextInfo?.name
+        && previousInfo?.role === nextInfo?.role
+        && previousInfo?.email === nextInfo?.email
+        && previousInfo?.photoUrl === nextInfo?.photoUrl
+        && previousUser?.role === nextUser?.role
+        && previousUser?.hasAppAccess === nextUser?.hasAppAccess
+        && previousUser?.isDeleted === nextUser?.isDeleted
+        && previousUser?.isSuperAdmin === nextUser?.isSuperAdmin
+        && samePermissions(previousUser?.permissions, nextUser?.permissions);
+});

@@ -31,21 +31,21 @@ export async function getAuthenticatedUserByEmail(email: string): Promise<AppUse
 }
 
 export async function syncUsersWithFirestore(
-  onUpdate: (users: AppUser[]) => void,
+  onUpdate: (users: AppUser[], isLoading: boolean) => void,
   onError?: (error: Error) => void
 ): Promise<() => void> {
   const usersRef = collection(db, 'users');
   if (!auth.currentUser) {
-    onUpdate([]);
+    onUpdate([], false);
     return () => {};
   }
   const usersById = new Map<string, AppUser>();
-  const pageSize = 20;
+  const pageSize = 100;
   const syncStartedAt = new Date().toISOString();
   let initialLoadComplete = false;
   let isActive = true;
   const notify = () => {
-    if (initialLoadComplete && isActive) onUpdate(Array.from(usersById.values()));
+    if (initialLoadComplete && isActive) onUpdate(Array.from(usersById.values()), false);
   };
   const handleError = (error: Error) => {
     console.error("Users subscription failed:", error);
@@ -87,12 +87,15 @@ export async function syncUsersWithFirestore(
           }
         });
 
+        if (isActive) onUpdate(Array.from(usersById.values()), true);
         if (page.size < pageSize) break;
         cursor = page.docs[page.docs.length - 1];
       }
       initialLoadComplete = true;
-      notify();
+      if (isActive) onUpdate(Array.from(usersById.values()), false);
     } catch (error) {
+      initialLoadComplete = true;
+      if (isActive) onUpdate(Array.from(usersById.values()), false);
       handleError(error instanceof Error ? error : new Error(String(error)));
     }
   })();
