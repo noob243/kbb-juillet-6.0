@@ -1,7 +1,7 @@
 import { AppUser, CreateUserPayload, UserRole, PersonnelCategory } from '../types/rbac';
 import { DEFAULT_ROLE_PERMISSIONS } from './rbacService';
 import { db, createAuthAccountIfPossible } from '../firebase';
-import { collection, doc, setDoc, updateDoc, getDoc, onSnapshot, getDocs, query, where, limit, runTransaction, writeBatch } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, getDoc, onSnapshot, getDocs, query, where, limit, runTransaction, writeBatch, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '../lib/firestoreService';
 import { auth, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -39,19 +39,68 @@ export async function syncUsersWithFirestore(
     onUpdate([]);
     return () => {};
   }
-  const unsub = onSnapshot(usersRef, (snapshot) => {
-    const remoteUsers: AppUser[] = [];
-    snapshot.forEach(docSnap => {
-      const user = docSnap.data() as AppUser;
-      remoteUsers.push({ ...user, id: docSnap.id });
-    });
-    onUpdate(remoteUsers);
-  }, (error) => {
+  const usersById = new Map<string, AppUser>();
+  const pageSize = 20;
+  const syncStartedAt = new Date().toISOString();
+  let initialLoadComplete = false;
+  let isActive = true;
+  const notify = () => {
+    if (initialLoadComplete && isActive) onUpdate(Array.from(usersById.values()));
+  };
+  const handleError = (error: Error) => {
     console.error("Users subscription failed:", error);
-    onError?.(error);
-  });
+    if (isActive) onError?.(error);
+  };
 
-  return unsub;
+  const unsubscribeChanges = onSnapshot(
+    query(usersRef, where('updatedAt', '>=', syncStartedAt)),
+    snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'removed') {
+          usersById.delete(change.doc.id);
+        } else {
+          const user = change.doc.data() as AppUser;
+          usersById.set(change.doc.id, { ...user, id: change.doc.id });
+        }
+      });
+      notify();
+    },
+    handleError
+  );
+
+  void (async () => {
+    let cursor: QueryDocumentSnapshot<DocumentData> | undefined;
+    try {
+      while (isActive) {
+        const pageQuery = query(
+          usersRef,
+          orderBy(documentId()),
+          ...(cursor ? [startAfter(cursor)] : []),
+          limit(pageSize)
+        );
+        const page = await getDocs(pageQuery);
+        page.docs.forEach(docSnap => {
+          const user = docSnap.data() as AppUser;
+          const current = usersById.get(docSnap.id);
+          if (!current || (user.updatedAt || '') >= (current.updatedAt || '')) {
+            usersById.set(docSnap.id, { ...user, id: docSnap.id });
+          }
+        });
+        if (!initialLoadComplete) initialLoadComplete = true;
+        notify();
+
+        if (page.size < pageSize) break;
+        cursor = page.docs[page.docs.length - 1];
+      }
+    } catch (error) {
+      handleError(error instanceof Error ? error : new Error(String(error)));
+    }
+  })();
+
+  return () => {
+    isActive = false;
+    unsubscribeChanges();
+  };
 }
 
 export async function createNewUser(payload: CreateUserPayload): Promise<AppUser> {
@@ -62,10 +111,9 @@ export async function createNewUser(payload: CreateUserPayload): Promise<AppUser
   }
 
   const newId = getUserDocumentId(email);
-  const existingUsers = await getDocs(collection(db, 'users'));
-  if (existingUsers.docs.some(userDoc =>
-    String(userDoc.data().email || '').trim().toLowerCase() === email
-  )) {
+  const usersRef = collection(db, 'users');
+  const existingUsers = await getDocs(query(usersRef, where('email', '==', email), limit(1)));
+  if (!existingUsers.empty) {
     throw new Error('Un profil utilisateur existe déjà pour cette adresse e-mail.');
   }
   
