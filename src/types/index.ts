@@ -160,6 +160,9 @@ export interface Task {
   emailReminderSent?: boolean;
   assigneeEmail?: string;
   attachments?: Array<{ name: string; size: string; content?: string }>;
+  createdAt?: string;
+  isArchived?: boolean;
+  archivedAt?: string;
 }
 
 export interface Invoice {
@@ -178,6 +181,7 @@ export interface Invoice {
   numeroFactureNormalisee?: string;
   montantFC?: number;
   montantRestantFC?: number;
+  createdAt?: string;
 }
 
 export interface Personnel {

@@ -17,6 +17,7 @@ import { TaskPriorityBadge } from '../components/common/TaskPriorityBadge';
 import { usePagination } from '../hooks/usePagination';
 import PaginationControls from '../components/common/PaginationControls';
 import { exportListToPdf, exportElementToPdf } from '../utils/pdfExport';
+import { recentFirst } from '../utils/recentFirst';
 
 interface GestionPageProps {
     clients: Client[];
@@ -321,7 +322,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
 
     // Filter and Category Search State
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchCategory, setSearchCategory] = useState<'all' | 'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'invoice' | 'fournisseur' | 'correspondance' | 'procedure'>('all');
+    const [searchCategory, setSearchCategory] = useState<'all' | 'client' | 'case' | 'avocat' | 'personnel' | 'event' | 'task' | 'archivedTask' | 'invoice' | 'fournisseur' | 'correspondance' | 'procedure'>('all');
 
     const matchesSearch = (text: string | number | undefined | null) => {
         if (!text) return false;
@@ -354,74 +355,83 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     };
 
     // Filter Avocats
-    const filteredAvocats = props.avocats.filter(item => {
+    const filteredAvocats = recentFirst<Avocat>(props.avocats.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'avocat') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.fullName) || matchesSearch(item.id) || matchesSearch(item.phone) || matchesSearch(item.cabinetRole) || matchesSearch(item.cabinetStatus);
-    });
+    }));
 
     // Filter Clients
-    const filteredClients = props.clients.filter(item => {
+    const filteredClients = recentFirst<Client>(props.clients.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'client') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.name) || matchesSearch(item.contact) || matchesSearch(item.email) || matchesSearch(item.phone) || matchesSearch(item.siege);
-    });
+    }));
 
     // Filter Cases
-    const filteredCases = props.cases.filter(item => {
+    const filteredCases = recentFirst<Case>(props.cases.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'case') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.name) || matchesSearch(item.id) || matchesSearch(item.client) || matchesSearch(item.status) || matchesSearch(item.notes);
-    });
+    }));
 
     // Filter Personnels
-    const filteredPersonnels = props.personnels.filter(item => {
+    const filteredPersonnels = recentFirst<Personnel>(props.personnels.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'personnel') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.fullName) || matchesSearch(item.id) || matchesSearch(item.role) || matchesSearch(item.email) || matchesSearch(item.phone);
-    });
+    }));
 
     // Filter Events
-    const filteredEvents = (props.events || []).filter(item => {
+    const filteredEvents = recentFirst<Event>((props.events || []).filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'event') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.name) || matchesSearch(item.id) || matchesSearch(item.lieu) || matchesSearch(item.type) || matchesSearch(item.partenaires);
-    });
+    }));
 
-    // Filter Tasks
-    const filteredTasks = (props.tasks || []).filter(item => {
+    const matchesTaskSearch = (item: Task) =>
+        !searchTerm || matchesSearch(item.name) || matchesSearch(item.id) || matchesSearch(item.lawyer) || matchesSearch(item.status) || matchesSearch(item.notes);
+
+    const filteredTasks = recentFirst<Task>((props.tasks || []).filter(item => {
+        if (item.isArchived || item.status === 'Effectué') return false;
         if (searchCategory !== 'all' && searchCategory !== 'task') return false;
-        if (!searchTerm) return true;
-        return matchesSearch(item.name) || matchesSearch(item.id) || matchesSearch(item.lawyer) || matchesSearch(item.status) || matchesSearch(item.notes);
-    });
+        return matchesTaskSearch(item);
+    }));
+
+    const filteredArchivedTasks = recentFirst<Task>((props.tasks || []).filter(item => {
+        if (!item.isArchived && item.status !== 'Effectué') return false;
+        if (searchCategory !== 'archivedTask') return false;
+        return matchesTaskSearch(item);
+    }));
+    const displayedTasks = searchCategory === 'archivedTask' ? filteredArchivedTasks : filteredTasks;
 
     // Filter Invoices
-    const filteredInvoices = (props.invoices || []).filter(item => {
+    const filteredInvoices = recentFirst<Invoice>((props.invoices || []).filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'invoice') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.id) || matchesSearch(item.caseId) || matchesSearch(item.status) || matchesSearch(item.etiquette);
-    });
+    }));
 
     // Filter Fournisseurs
-    const filteredFournisseurs = (props.fournisseurs || []).filter(item => {
+    const filteredFournisseurs = recentFirst<Fournisseur>((props.fournisseurs || []).filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'fournisseur') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.nomComplet) || matchesSearch(item.id) || matchesSearch(item.designationPrestation) || matchesSearch(item.naturePrestation) || matchesSearch(item.adresseMail);
-    });
+    }));
 
     // Filter Correspondances
-    const filteredCorrespondances = correspondances.filter(item => {
+    const filteredCorrespondances = recentFirst<Correspondance>(correspondances.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'correspondance') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.id) || matchesSearch(item.subject) || matchesSearch(item.recipientName) || matchesSearch(item.author) || matchesSearch(item.content);
-    });
+    }));
 
     // Filter Procédures
-    const filteredProcedures = allProcedures.filter(item => {
+    const filteredProcedures = recentFirst<CaseProcedure & { caseId: string; caseName: string }>(allProcedures.filter(item => {
         if (searchCategory !== 'all' && searchCategory !== 'procedure') return false;
         if (!searchTerm) return true;
         return matchesSearch(item.id) || matchesSearch(item.name) || matchesSearch(item.instance) || matchesSearch(item.objet) || matchesSearch(item.status) || matchesSearch(item.caseId) || matchesSearch(item.caseName);
-    });
+    }));
 
     const paginationResetKey = `${searchTerm}:${searchCategory}`;
     const avocatsPagination = usePagination<Avocat>(filteredAvocats, paginationResetKey);
@@ -429,7 +439,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
     const casesPagination = usePagination<Case>(filteredCases, paginationResetKey);
     const personnelsPagination = usePagination<Personnel>(filteredPersonnels, paginationResetKey);
     const eventsPagination = usePagination<Event>(filteredEvents, paginationResetKey);
-    const tasksPagination = usePagination<Task>(filteredTasks, paginationResetKey);
+    const tasksPagination = usePagination<Task>(displayedTasks, paginationResetKey);
     const invoicesPagination = usePagination<Invoice>(filteredInvoices, paginationResetKey);
     const fournisseursPagination = usePagination<Fournisseur>(filteredFournisseurs, paginationResetKey);
     const correspondancesPagination = usePagination<Correspondance>(filteredCorrespondances, paginationResetKey);
@@ -637,6 +647,7 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                             <option value="personnel">👔 Membres du Personnel ({filteredPersonnels.length})</option>
                             <option value="event">📅 Événements & Activités ({filteredEvents.length})</option>
                             <option value="task">✅ Tâches assignées ({filteredTasks.length})</option>
+                            <option value="archivedTask">🗄️ Archives des tâches ({(props.tasks || []).filter(task => task.isArchived || task.status === 'Effectué').length})</option>
                             <option value="invoice">💵 Factures & Paiements ({filteredInvoices.length})</option>
                             <option value="fournisseur">📦 Fournisseurs & Prestations ({filteredFournisseurs.length})</option>
                             <option value="correspondance">✉️ Correspondances ({filteredCorrespondances.length})</option>
@@ -1627,18 +1638,24 @@ const GestionPage: FC<GestionPageProps> = (props) => {
             )}
 
             {/* Section Tâches */}
-            {(searchCategory === 'all' || searchCategory === 'task') && (
+            {(searchCategory === 'all' || searchCategory === 'task' || searchCategory === 'archivedTask') && (
                 <div className="bg-white rounded-2xl border border-gray-150 overflow-hidden shadow-xs mb-10">
                     <div className="p-4 bg-slate-50/50 border-b border-gray-150 flex justify-between items-center">
                         <div>
-                            <h3 className="text-sm font-black text-gray-800 tracking-tight">Tâches assignées ({filteredTasks.length})</h3>
-                            <p className="text-[10px] text-gray-400 font-bold mt-0.5">Suivi des tâches, avocats responsables et statuts</p>
+                            <h3 className="text-sm font-black text-gray-800 tracking-tight">
+                                {searchCategory === 'archivedTask' ? 'Archives des tâches' : 'Tâches assignées'} ({displayedTasks.length})
+                            </h3>
+                            <p className="text-[10px] text-gray-400 font-bold mt-0.5">
+                                {searchCategory === 'archivedTask'
+                                    ? 'Tâches terminées conservées avec leur dossier, leurs pièces jointes et leurs références'
+                                    : 'Suivi des tâches en cours, avocats responsables et statuts'}
+                            </p>
                         </div>
                         <button
                             onClick={() => {
                                 const cols = ['ID', 'Intitulé Tâche', 'Dossier Réf', 'Avocat Responsable', 'Échéance', 'Statut', 'Pièces Jointes'];
-                                const rows = filteredTasks.map(t => [t.id, t.name, t.caseId || 'N/A', t.lawyer, t.dueDate, t.status, (t.attachments || []).length + ' fichier(s)']);
-                                exportListToPdf("Suivi des Tâches & Directives", cols, rows, "liste_taches");
+                                const rows = displayedTasks.map(t => [t.id, t.name, t.caseId || 'N/A', t.lawyer, t.dueDate, t.status, (t.attachments || []).length + ' fichier(s)']);
+                                exportListToPdf(searchCategory === 'archivedTask' ? "Archives des Tâches" : "Suivi des Tâches & Directives", cols, rows, searchCategory === 'archivedTask' ? "archives_taches" : "liste_taches");
                             }}
                             className="px-3 py-1.5 bg-[#15447c] text-white hover:bg-indigo-900 font-extrabold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs cursor-pointer"
                             title="Télécharger le suivi des tâches au format PDF"
@@ -1735,7 +1752,14 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <td className={`${tableCellClass} font-bold text-gray-800`}>{item.name}</td>
+                                                    <td className={`${tableCellClass} font-bold text-gray-800`}>
+                                                        {item.name}
+                                                        {searchCategory === 'archivedTask' && item.archivedAt && (
+                                                            <span className="block mt-1 text-[10px] text-slate-400 font-medium">
+                                                                Archivée le {new Date(item.archivedAt).toLocaleDateString('fr-FR')}
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                     <td className={`${tableCellClass} font-bold font-mono text-gray-500`}>{item.caseId}</td>
                                                     <td className={`${tableCellClass} font-extrabold text-[#15447c]`}>{item.lawyer}</td>
                                                     <td className={`${tableCellClass} font-semibold font-mono text-slate-650`}>{item.dueDate}</td>
@@ -1790,8 +1814,8 @@ const GestionPage: FC<GestionPageProps> = (props) => {
                 </div>
             )}
 
-            {(searchCategory === 'all' || searchCategory === 'task') && (
-                <PaginationControls currentPage={tasksPagination.currentPage} pageCount={tasksPagination.pageCount} startIndex={tasksPagination.startIndex} totalItems={filteredTasks.length} itemLabel="tâches" onPageChange={tasksPagination.setCurrentPage} />
+            {(searchCategory === 'all' || searchCategory === 'task' || searchCategory === 'archivedTask') && (
+                <PaginationControls currentPage={tasksPagination.currentPage} pageCount={tasksPagination.pageCount} startIndex={tasksPagination.startIndex} totalItems={displayedTasks.length} itemLabel={searchCategory === 'archivedTask' ? 'tâches archivées' : 'tâches'} onPageChange={tasksPagination.setCurrentPage} />
             )}
 
             {/* Section Factures */}

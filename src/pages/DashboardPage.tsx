@@ -23,6 +23,7 @@ import { AppUser } from '../types/rbac';
 import { canViewFinancialStats, hasPermission } from '../services/rbacService';
 import { Lock, ExternalLink } from 'lucide-react';
 import { isActiveCase, isCaseForClient } from '../utils/caseHelpers';
+import { recentFirst } from '../utils/recentFirst';
 
 interface DashboardPageProps {
   clients: Client[];
@@ -53,7 +54,7 @@ const DashboardPage: FC<DashboardPageProps> = ({ clients = [], cases = [], event
 
     const activeCases = safeCases.filter(c => c && (c.status === 'En cours' || c.status === 'Nouveau'));
     const upcomingEvents = safeEvents.filter(e => e && e.date && new Date(e.date) >= new Date());
-    const pendingTasks = safeTasks.filter(t => t && t.status !== 'Effectué');
+    const pendingTasks = safeTasks.filter(t => t && t.status !== 'Effectué' && !t.isArchived);
 
     // Weekly distribution calculation for new cases and client arrivals
     const weeklyData = useMemo(() => {
@@ -339,11 +340,7 @@ const DashboardPage: FC<DashboardPageProps> = ({ clients = [], cases = [], event
     };
 
     // Sort tasks to show active (non-completed) tasks first, then by date priority
-    const sortedTasks = [...tasks].sort((a, b) => {
-        if (a.status !== 'Effectué' && b.status === 'Effectué') return -1;
-        if (a.status === 'Effectué' && b.status !== 'Effectué') return 1;
-        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-    });
+    const sortedTasks = recentFirst<Task>(tasks.filter(task => task.status !== 'Effectué' && !task.isArchived));
 
     return (
         <div className="space-y-8 animate-fade-in">

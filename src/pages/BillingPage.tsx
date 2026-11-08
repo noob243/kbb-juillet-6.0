@@ -10,6 +10,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tool
 import { Eye, Mail, Lock, ExternalLink } from 'lucide-react';
 import { usePagination } from '../hooks/usePagination';
 import PaginationControls from '../components/common/PaginationControls';
+import { recentFirst } from '../utils/recentFirst';
 
 interface BillingPageProps {
   invoices: Invoice[];
@@ -72,29 +73,33 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
     });
 
     // Calculate billing summary statistics on userVisibleInvoices
-    const { totalInvoiced, totalPaid, totalUnpaid } = userVisibleInvoices.reduce((totals, invoice) => {
+    const billingInvoices = userVisibleInvoices.map(invoice => {
         const amounts = getInvoiceAmounts(invoice);
         return {
-            totalInvoiced: totals.totalInvoiced + amounts.total,
-            totalPaid: totals.totalPaid + amounts.paid,
-            totalUnpaid: totals.totalUnpaid + amounts.remaining,
+            ...invoice,
+            totalAmount: amounts.total,
+            paidAmount: amounts.paid,
+            status: getInvoiceStatus(invoice)
         };
-    }, { totalInvoiced: 0, totalPaid: 0, totalUnpaid: 0 });
-    const unpaidCount = userVisibleInvoices.filter(inv => getInvoiceStatus(inv) !== 'Réglée').length;
+    });
+    const totalInvoiced = billingInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+    const totalPaid = billingInvoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
+    const totalUnpaid = billingInvoices.reduce((sum, inv) => sum + getInvoiceAmounts(inv).remaining, 0);
+    const unpaidCount = billingInvoices.filter(inv => inv.status !== 'Réglée').length;
     const recoveryRate = totalInvoiced > 0 ? (totalPaid / totalInvoiced) * 100 : 0;
 
     // Filter invoices by search query
-    const filteredInvoices = userVisibleInvoices.filter(invoice => {
+    const filteredInvoices = recentFirst<Invoice>(billingInvoices.filter(invoice => {
         const relatedCase = cases.find(c => c.id === invoice.caseId);
         const searchTarget = `${invoice.id} ${invoice.status} ${invoice.dueDate} ${invoice.etiquette || ''} ${relatedCase ? relatedCase.name : ''}`.toLowerCase();
         return searchTarget.includes(searchQuery.toLowerCase());
-    });
+    }));
     const pagination = usePagination<Invoice>(filteredInvoices, searchQuery);
 
     // Prepare chronological data for Recharts AreaChart
     const getChartData = () => {
         // Sort and map
-        const sorted = [...userVisibleInvoices].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+        const sorted = [...billingInvoices].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
         const groups: { [key: string]: { total: number; unpaid: number; displayMonth: string } } = {};
 
         sorted.forEach(inv => {
@@ -174,7 +179,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                         <span className="block text-3xs font-black uppercase text-slate-400 tracking-wider">Total facturé</span>
                         <h3 className="text-xl font-black text-slate-800 mt-1">{formatCurrency(totalInvoiced)}</h3>
                         <div className="flex items-center gap-1.5 mt-2">
-                            <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.2 rounded font-bold">Cabinet global</span>
+                            <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.2 rounded font-bold">Selon votre périmètre</span>
                         </div>
                     </div>
                     {/* card 2 */}
@@ -238,7 +243,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                     <YAxis 
                                         tickLine={false} 
                                         axisLine={false} 
-                                        tickFormatter={(v) => `${v} €`}
+                                        tickFormatter={(v) => `${v} $`}
                                         tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 'bold' }} 
                                     />
                                     <Tooltip 
@@ -250,7 +255,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         }}
                                         itemStyle={{ color: '#fff', fontSize: '11px', fontWeight: 'bold' }}
                                         labelStyle={{ color: '#94a3b8', fontSize: '9px', fontWeight: 'bold', marginBottom: '4px' }}
-                                        formatter={(value: any) => [`${value} €`]}
+                                        formatter={(value: any) => [`${value} $`]}
                                     />
                                     <Area 
                                         type="monotone" 
@@ -291,7 +296,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         <span className="text-xs font-bold text-gray-700">Factures Réglées</span>
                                     </div>
                                     <span className="text-xs font-bold font-mono text-gray-900">
-                                        {userVisibleInvoices.filter(i => getInvoiceStatus(i) === 'Réglée').length}
+                                        {billingInvoices.filter(i => i.status === 'Réglée').length}
                                     </span>
                                 </div>
 
@@ -302,7 +307,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         <span className="text-xs font-bold text-gray-700">Factures En Cours</span>
                                     </div>
                                     <span className="text-xs font-bold font-mono text-gray-900">
-                                        {userVisibleInvoices.filter(i => getInvoiceStatus(i) === 'En cours').length}
+                                        {billingInvoices.filter(i => i.status === 'En cours').length}
                                     </span>
                                 </div>
 
@@ -313,7 +318,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         <span className="text-xs font-bold text-gray-700">Factures Non Réglées</span>
                                     </div>
                                     <span className="text-xs font-bold font-mono text-gray-900">
-                                        {userVisibleInvoices.filter(i => getInvoiceStatus(i) === 'Non réglée').length}
+                                        {billingInvoices.filter(i => i.status === 'Non réglée').length}
                                     </span>
                                 </div>
                             </div>

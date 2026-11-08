@@ -40,6 +40,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState<'all' | 'Haute' | 'Moyenne' | 'Basse'>('all');
     const [showOnlyOverdue, setShowOnlyOverdue] = useState(false);
+    const [showArchivedTasks, setShowArchivedTasks] = useState(false);
     const [activeView, setActiveView] = useState<'calendar' | 'list'>('calendar');
     const [calendarDate, setCalendarDate] = useState(new Date());
     const [selectedFilterDate, setSelectedFilterDate] = useState<string | null>(null);
@@ -182,7 +183,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     }
 
     const getTasksForDate = (dateStr: string) => {
-        return tasks.filter(task => {
+        return activeTasks.filter(task => {
             const start = task.startDate || task.dueDate;
             const end = task.endDate || task.dueDate;
             return dateStr >= start && dateStr <= end;
@@ -199,20 +200,24 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
         return dateStr >= start && dateStr <= end;
     };
 
-    const baseTasks = tasks.filter(task => {
+    const activeTasks = tasks.filter(task => task.status !== 'Effectué' && !task.isArchived);
+    const baseTasks = activeTasks.filter(task => {
         if (showOnlyOverdue && !isOverdue(task)) return false;
         if (priorityFilter !== 'all' && (task.priority || 'Moyenne') !== priorityFilter) return false;
         return true;
     });
 
-    const finalTasks = selectedFilterDate
-        ? baseTasks.filter(task => isTaskActiveOnDate(task, selectedFilterDate))
-        : baseTasks;
+    const archivedTasks = tasks.filter(task => task.isArchived || task.status === 'Effectué');
+    const finalTasks = showArchivedTasks
+        ? archivedTasks
+        : selectedFilterDate
+            ? baseTasks.filter(task => isTaskActiveOnDate(task, selectedFilterDate))
+            : baseTasks;
 
     const finalEvents = selectedFilterDate
         ? events.filter(event => event.date === selectedFilterDate)
         : events;
-    const taskPagination = usePagination<Task>(finalTasks, `${selectedFilterDate}:${priorityFilter}:${showOnlyOverdue}`);
+    const taskPagination = usePagination<Task>(finalTasks, `${selectedFilterDate}:${priorityFilter}:${showOnlyOverdue}:${showArchivedTasks}`);
     const eventPagination = usePagination<Event>(finalEvents, selectedFilterDate || '');
 
     const handlePrevMonth = () => {
@@ -233,9 +238,9 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     };
 
     const completedTasksCount = tasks.filter(t => t.status === 'Effectué').length;
-    const overdueTasksCount = tasks.filter(t => isOverdue(t)).length;
-    const upcomingTasksCount = tasks.filter(t => t.status !== 'Effectué' && !isOverdue(t)).length;
-    const highPriorityTasksCount = tasks.filter(t => t.priority === 'Haute').length;
+    const overdueTasksCount = activeTasks.filter(t => isOverdue(t)).length;
+    const upcomingTasksCount = activeTasks.filter(t => !isOverdue(t)).length;
+    const highPriorityTasksCount = activeTasks.filter(t => t.priority === 'Haute').length;
 
     return (
         <>
@@ -345,13 +350,23 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
-                            Vue Liste (Tâches: {tasks.length} | Événements: {events.length})
+                            Vue Liste (Tâches: {activeTasks.length} | Événements: {events.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowArchivedTasks(value => !value);
+                                setActiveView('list');
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${showArchivedTasks ? 'bg-[#15447c] text-white shadow-sm' : 'bg-white text-indigo-700 border border-indigo-100 hover:bg-indigo-50'}`}
+                        >
+                            Archives ({archivedTasks.length})
                         </button>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                         {/* Priority and Overdue filter tabs */}
-                        <div className="flex flex-wrap items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs">
+                        {!showArchivedTasks && <div className="flex flex-wrap items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-200 text-xs">
                             <button 
                                 type="button"
                                 onClick={() => {
@@ -409,7 +424,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                             >
                                 Retards ({overdueTasksCount})
                             </button>
-                        </div>
+                        </div>}
                         
                         <div className="text-xs text-gray-500 font-medium hidden sm:block">
                             Aujourd'hui : <span className="font-bold text-gray-700">{new Date().toLocaleDateString('fr-FR')}</span>
@@ -418,7 +433,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                 </div>
 
                 {/* Selected Date Notification banner */}
-                {selectedFilterDate && (
+                {selectedFilterDate && !showArchivedTasks && (
                     <div className="mb-4 bg-indigo-50 border border-indigo-150 rounded-xl p-3 flex justify-between items-center text-sm text-indigo-900">
                         <div className="flex items-center gap-2">
                             <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -915,7 +930,7 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                         pageCount={taskPagination.pageCount}
                         startIndex={taskPagination.startIndex}
                         totalItems={finalTasks.length}
-                        itemLabel="tâches"
+                        itemLabel={showArchivedTasks ? 'tâches archivées' : 'tâches'}
                         onPageChange={taskPagination.setCurrentPage}
                     />
                     {hasMoreTasks && onLoadMoreTasks && (

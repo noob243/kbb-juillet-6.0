@@ -46,6 +46,7 @@ import { DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from './services/rbacServic
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { safeRemoveItem } from './utils/storageHelper';
 import { isActiveCase, isCaseForClient } from './utils/caseHelpers';
+import { recentFirst } from './utils/recentFirst';
 
 declare const jspdf: any;
 
@@ -56,6 +57,21 @@ const loadLocalCache = <T,>(key: string): T[] => {
 
 const saveLocalCache = <T,>(key: string, _data: T[]) => {
     safeRemoveItem(key);
+};
+
+const normalizeInvoice = (invoice: Invoice, setCreationDate = false): Invoice => {
+    const totalAmount = Math.max(0, Number(invoice.totalAmount) || 0);
+    const enteredPaidAmount = Math.max(0, Number(invoice.paidAmount) || 0);
+    const isSettled = invoice.status === 'Réglée' || (totalAmount > 0 && enteredPaidAmount >= totalAmount);
+    const paidAmount = isSettled ? totalAmount : Math.min(totalAmount, enteredPaidAmount);
+
+    return {
+        ...invoice,
+        totalAmount,
+        paidAmount,
+        status: isSettled ? 'Réglée' : paidAmount > 0 || invoice.status === 'En cours' ? 'En cours' : 'Non réglée',
+        createdAt: invoice.createdAt || (setCreationDate ? new Date().toISOString() : undefined)
+    };
 };
 
 function App() {
@@ -123,7 +139,7 @@ function App() {
     const loadMoreTasks = async () => {
         if (!lastTaskDoc || !hasMoreTasks) return;
         try {
-            const nextQuery = query(collection(db, 'tasks'), startAfter(lastTaskDoc), limit(50));
+            const nextQuery = query(collection(db, 'tasks'), orderBy('id', 'desc'), startAfter(lastTaskDoc), limit(50));
             const snap = await getDocs(nextQuery);
             if (snap.empty) {
                 setHasMoreTasks(false);
@@ -144,7 +160,7 @@ function App() {
                     ...data
                 });
             });
-            setTasks(newList);
+            setTasks(recentFirst<Task>(newList));
             setLastTaskDoc(lastDoc);
             setHasMoreTasks(snap.docs.length === 50);
         } catch (e) {
@@ -561,7 +577,7 @@ function App() {
             }));
 
             // Query initial batch of tasks with startAfter pagination support
-            const tasksQuery = query(collection(db, 'tasks'), limit(50));
+            const tasksQuery = query(collection(db, 'tasks'), orderBy('id', 'desc'), limit(50));
             delayedUnsubs.push(onSnapshot(tasksQuery, (snap) => {
                 if (snap.metadata.hasPendingWrites) return;
                 const list: Task[] = [];
@@ -579,15 +595,15 @@ function App() {
                         ...data
                     });
                 });
-                list.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+                const recentTasks = recentFirst<Task>(list);
                 if (list.length > 0) {
-                    setTasks(list);
+                    setTasks(recentTasks);
                     if (lastDoc) setLastTaskDoc(lastDoc);
                     setHasMoreTasks(snap.docs.length === 50);
                 } else {
                     const cached = loadLocalCache<Task>('kbb_cache_tasks');
                     if (cached.length > 0) {
-                        setTasks(cached);
+                        setTasks(recentFirst<Task>(cached));
                         syncLocalCollection('tasks', cached);
                     } else {
                         setTasks([]);
@@ -879,11 +895,18 @@ function App() {
     };
 
     const handleUpdateTask = async (updatedTask: Task) => {
-        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+        const existingTask = tasks.find(t => t.id === updatedTask.id);
+        const normalizedTask: Task = updatedTask.status === 'Effectué'
+            ? { ...updatedTask, isArchived: true, archivedAt: updatedTask.archivedAt || new Date().toISOString() }
+            : { ...updatedTask, isArchived: false, archivedAt: '' };
+        if (!normalizedTask.createdAt && existingTask?.createdAt) {
+            normalizedTask.createdAt = existingTask.createdAt;
+        }
+        setTasks(prev => prev.map(t => t.id === normalizedTask.id ? normalizedTask : t));
         try {
-            const { id, ...cleanTask } = updatedTask;
+            const { id, ...cleanTask } = normalizedTask;
             await dbUpdateDoc('tasks', id, cleanTask);
-            triggerToast('success', `Tâche "${updatedTask.name}" mise à jour !`);
+            triggerToast('success', `Tâche "${normalizedTask.name}" mise à jour !`);
         } catch (err) {
             triggerToast('error', "Échec de modification de la tâche.");
         }
@@ -1113,7 +1136,9 @@ function App() {
                 let currentMaxId = tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) : 0;
                 for (const t of tasksToAdd) {
                     currentMaxId++;
-                    const taskProps = { ...t, id: currentMaxId };
+                    const taskProps: Task = t.status === 'Effectué'
+                        ? { ...t, id: currentMaxId, createdAt: t.createdAt || new Date().toISOString(), isArchived: true, archivedAt: t.archivedAt || new Date().toISOString() }
+                        : { ...t, id: currentMaxId, createdAt: t.createdAt || new Date().toISOString() };
                     setTasks(prev => [...prev, taskProps]);
                     const { id: _, ...cleanTask } = taskProps;
                     await dbCreateDoc('tasks', currentMaxId, cleanTask);
@@ -1152,10 +1177,13 @@ function App() {
 
     const handleAddTask = async (newTask: Omit<Task, 'id'>) => {
         const nextId = (tasks.length > 0 ? Math.max(...tasks.map(t => t.id)) : 0) + 1;
-        const record = { ...newTask, id: nextId };
+        const record: Task = newTask.status === 'Effectué'
+            ? { ...newTask, id: nextId, createdAt: newTask.createdAt || new Date().toISOString(), isArchived: true, archivedAt: newTask.archivedAt || new Date().toISOString() }
+            : { ...newTask, id: nextId, createdAt: newTask.createdAt || new Date().toISOString() };
         setTasks(prev => [...prev, record]);
         try {
-            await dbCreateDoc('tasks', nextId, newTask);
+            const { id: _id, ...taskData } = record;
+            await dbCreateDoc('tasks', nextId, taskData);
             triggerToast('success', `Tâche "${newTask.name}" programmée avec succès.`);
             logActivity('Ajout', 'Tâches', `Programmation de la tâche "${newTask.name}" pour ${newTask.lawyer}`, newTask);
         } catch (err) {
@@ -1165,9 +1193,12 @@ function App() {
 
     const handleUpdateTaskStatus = async (id: number, status: 'Effectué' | 'Non effectué' | 'Effectué à moitié') => {
         const task = tasks.find(t => t.id === id);
-        setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+        const update = status === 'Effectué'
+            ? { status, isArchived: true, archivedAt: task?.archivedAt || new Date().toISOString() }
+            : { status, isArchived: false, archivedAt: '' };
+        setTasks(prev => prev.map(t => t.id === id ? { ...t, ...update } : t));
         try {
-            await dbUpdateDoc('tasks', id, { status });
+            await dbUpdateDoc('tasks', id, update);
             triggerToast('success', `Statut de la tâche mis à jour !`);
             logActivity('Modification', 'Tâches', `Mise à jour du statut de la tâche "${task?.name || id}" à "${status}"`);
         } catch (err) {
@@ -1176,12 +1207,13 @@ function App() {
     };
 
     const handleAddInvoice = async (newInvoice: Invoice) => {
-        setInvoices(prev => [...prev, newInvoice]);
+        const invoice = normalizeInvoice(newInvoice, true);
+        setInvoices(prev => [...prev, invoice]);
         try {
-            const { id, ...cleanInvoice } = newInvoice;
+            const { id, ...cleanInvoice } = invoice;
             await dbCreateDoc('invoices', id, cleanInvoice);
-            triggerToast('success', `Facture "${newInvoice.id}" émise avec succès !`);
-            logActivity('Ajout', 'Facturation', `Émission de la facture "${newInvoice.id}" de ${newInvoice.totalAmount}€ pour le dossier "${newInvoice.caseId}"`, cleanInvoice);
+            triggerToast('success', `Facture "${invoice.id}" émise avec succès !`);
+            logActivity('Ajout', 'Facturation', `Émission de la facture "${invoice.id}" de ${invoice.totalAmount}$ pour le dossier "${invoice.caseId}"`, cleanInvoice);
         } catch (err) {
             triggerToast('error', "Échec de l'émission de la facture.");
         }
@@ -1542,11 +1574,16 @@ function App() {
     };
 
     const handleUpdateInvoice = async (updated: Invoice) => {
-        setInvoices(prev => prev.map(i => i.id === updated.id ? updated : i));
+        const existingInvoice = invoices.find(i => i.id === updated.id);
+        const normalizedInvoice = normalizeInvoice({
+            ...updated,
+            createdAt: updated.createdAt || existingInvoice?.createdAt
+        });
+        setInvoices(prev => prev.map(i => i.id === normalizedInvoice.id ? normalizedInvoice : i));
         try {
-            const { id, ...properties } = updated;
+            const { id, ...properties } = normalizedInvoice;
             await dbUpdateDoc('invoices', id, properties);
-            triggerToast('success', `Données de la facture "${updated.id}" sauvegardées !`);
+            triggerToast('success', `Données de la facture "${normalizedInvoice.id}" sauvegardées !`);
         } catch (err) {
             triggerToast('error', "Échec lors de la mise à jour de la facture.");
         }
