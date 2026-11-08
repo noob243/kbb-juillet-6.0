@@ -605,26 +605,16 @@ function App() {
                 snap.forEach(d => {
                     const data = d.data() as any;
                     list.push({
+                        ...data,
                         id: data.id || d.id,
                         caseId: data.caseId || '',
                         dueDate: data.dueDate || '',
                         totalAmount: data.totalAmount !== undefined ? Number(data.totalAmount) : 0,
                         paidAmount: data.paidAmount !== undefined ? Number(data.paidAmount) : 0,
-                        status: data.status || 'Non réglée',
-                        ...data
+                        status: data.status || 'Non réglée'
                     });
                 });
-                if (list.length > 0) {
-                    setInvoices(list);
-                } else {
-                    const cached = loadLocalCache<Invoice>('kbb_cache_invoices');
-                    if (cached.length > 0) {
-                        setInvoices(cached);
-                        syncLocalCollection('invoices', cached);
-                    } else {
-                        setInvoices([]);
-                    }
-                }
+                setInvoices(list);
             }, (err) => {
                 console.warn("Invoices subscription notice (Quota/Offline):", err?.message);
                 const cached = loadLocalCache<Invoice>('kbb_cache_invoices');

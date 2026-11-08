@@ -42,6 +42,23 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
     };
     
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+    const toAmount = (value: number) => {
+        const amount = Number(value);
+        return Number.isFinite(amount) ? Math.max(0, amount) : 0;
+    };
+    const getInvoiceAmounts = (invoice: Invoice) => {
+        const total = toAmount(invoice.totalAmount);
+        const paid = invoice.status === 'Réglée'
+            ? total
+            : Math.min(total, toAmount(invoice.paidAmount));
+        return { total, paid, remaining: total - paid };
+    };
+    const getInvoiceStatus = (invoice: Invoice) => {
+        const amounts = getInvoiceAmounts(invoice);
+        if (invoice.status === 'Réglée' || (amounts.total > 0 && amounts.remaining === 0)) return 'Réglée';
+        if (invoice.status === 'En cours' || amounts.paid > 0) return 'En cours';
+        return 'Non réglée';
+    };
 
     // Determine admin status
     const userEmail = currentUser?.email?.trim().toLowerCase();
@@ -55,10 +72,15 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
     });
 
     // Calculate billing summary statistics on userVisibleInvoices
-    const totalInvoiced = userVisibleInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-    const totalPaid = userVisibleInvoices.reduce((sum, inv) => sum + inv.paidAmount, 0);
-    const totalUnpaid = userVisibleInvoices.reduce((sum, inv) => sum + Math.max(0, inv.totalAmount - inv.paidAmount), 0);
-    const unpaidCount = userVisibleInvoices.filter(inv => inv.status !== 'Réglée').length;
+    const { totalInvoiced, totalPaid, totalUnpaid } = userVisibleInvoices.reduce((totals, invoice) => {
+        const amounts = getInvoiceAmounts(invoice);
+        return {
+            totalInvoiced: totals.totalInvoiced + amounts.total,
+            totalPaid: totals.totalPaid + amounts.paid,
+            totalUnpaid: totals.totalUnpaid + amounts.remaining,
+        };
+    }, { totalInvoiced: 0, totalPaid: 0, totalUnpaid: 0 });
+    const unpaidCount = userVisibleInvoices.filter(inv => getInvoiceStatus(inv) !== 'Réglée').length;
     const recoveryRate = totalInvoiced > 0 ? (totalPaid / totalInvoiced) * 100 : 0;
 
     // Filter invoices by search query
@@ -89,13 +111,13 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
             ][monthVal];
 
             const displayMonth = `${monthLabel} ${year}`;
-            const remaining = Math.max(0, inv.totalAmount - inv.paidAmount);
+            const amounts = getInvoiceAmounts(inv);
 
             if (!groups[key]) {
                 groups[key] = { total: 0, unpaid: 0, displayMonth };
             }
-            groups[key].total += inv.totalAmount;
-            groups[key].unpaid += remaining;
+            groups[key].total += amounts.total;
+            groups[key].unpaid += amounts.remaining;
         });
 
         const list = Object.entries(groups)
@@ -269,7 +291,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         <span className="text-xs font-bold text-gray-700">Factures Réglées</span>
                                     </div>
                                     <span className="text-xs font-bold font-mono text-gray-900">
-                                        {invoices.filter(i => i.status === 'Réglée').length}
+                                        {userVisibleInvoices.filter(i => getInvoiceStatus(i) === 'Réglée').length}
                                     </span>
                                 </div>
 
@@ -280,7 +302,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         <span className="text-xs font-bold text-gray-700">Factures En Cours</span>
                                     </div>
                                     <span className="text-xs font-bold font-mono text-gray-900">
-                                        {invoices.filter(i => i.status === 'En cours').length}
+                                        {userVisibleInvoices.filter(i => getInvoiceStatus(i) === 'En cours').length}
                                     </span>
                                 </div>
 
@@ -291,7 +313,7 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                         <span className="text-xs font-bold text-gray-700">Factures Non Réglées</span>
                                     </div>
                                     <span className="text-xs font-bold font-mono text-gray-900">
-                                        {invoices.filter(i => i.status === 'Non réglée').length}
+                                        {userVisibleInvoices.filter(i => getInvoiceStatus(i) === 'Non réglée').length}
                                     </span>
                                 </div>
                             </div>
@@ -350,7 +372,8 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                 ) : (
                                     pagination.visibleItems.map(invoice => {
                                         const relatedCase = cases.find(c => c.id === invoice.caseId);
-                                        const remainingAmount = Math.max(0, invoice.totalAmount - invoice.paidAmount);
+                                        const amounts = getInvoiceAmounts(invoice);
+                                        const invoiceStatus = getInvoiceStatus(invoice);
                                         return (
                                             <tr key={invoice.id} className="hover:bg-slate-50/50 transition duration-150">
                                                 <td className="p-4">
@@ -394,16 +417,16 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                                 </td>
                                                 <td className="p-4 text-xs font-semibold text-slate-600">{invoice.dueDate}</td>
                                                 <td className="p-4 text-right">
-                                                    <div className="text-xs font-mono font-medium text-slate-700">{formatCurrency(invoice.totalAmount)}</div>
+                                                    <div className="text-xs font-mono font-medium text-slate-700">{formatCurrency(amounts.total)}</div>
                                                     {invoice.montantFC !== undefined && invoice.montantFC !== null && (
                                                         <div className="text-[10px] font-mono font-extrabold text-emerald-700 mt-0.5">
                                                             {Number(invoice.montantFC).toLocaleString()} FC
                                                         </div>
                                                     )}
                                                 </td>
-                                                <td className="p-4 text-xs font-mono text-emerald-700 font-bold text-right">{formatCurrency(invoice.paidAmount)}</td>
+                                                <td className="p-4 text-xs font-mono text-emerald-700 font-bold text-right">{formatCurrency(amounts.paid)}</td>
                                                 <td className="p-4 text-right bg-rose-50/20">
-                                                    <div className="text-xs font-mono font-black text-rose-600">{formatCurrency(remainingAmount)}</div>
+                                                    <div className="text-xs font-mono font-black text-rose-600">{formatCurrency(amounts.remaining)}</div>
                                                     {invoice.montantRestantFC !== undefined && invoice.montantRestantFC !== null && (
                                                         <div className="text-[10px] font-mono font-black text-rose-700 mt-0.5">
                                                             {Number(invoice.montantRestantFC).toLocaleString()} FC
@@ -411,8 +434,8 @@ const BillingPage: FC<BillingPageProps> = ({ invoices, cases, clients = [], avoc
                                                     )}
                                                 </td>
                                                 <td className="p-4">
-                                                    <span className={`px-2.5 py-1 border text-3xs font-black uppercase rounded-lg ${getStatusClass(invoice.status)}`}>
-                                                        {invoice.status}
+                                                    <span className={`px-2.5 py-1 border text-3xs font-black uppercase rounded-lg ${getStatusClass(invoiceStatus)}`}>
+                                                        {invoiceStatus}
                                                     </span>
                                                 </td>
                                                 <td className="p-4">
