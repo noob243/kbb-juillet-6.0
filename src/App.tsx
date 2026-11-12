@@ -1,25 +1,7 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react';
 
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import ClientsPage from './pages/ClientsPage';
-import CasesPage from './pages/CasesPage';
-import ProceduresPage from './pages/ProceduresPage';
-import EventsPage from './pages/EventsPage';
-import AgendaPage from './pages/AgendaPage';
-import ChatPage from './pages/ChatPage';
-import BillingPage from './pages/BillingPage';
-import AvocatsPage from './pages/AvocatsPage';
-import PersonnelsPage from './pages/PersonnelsPage';
-import FournisseursPage from './pages/FournisseursPage';
-import GestionPage from './pages/GestionPage';
-import AllInterfacesPage from './pages/AllInterfacesPage';
-import AIAssistantPage from './pages/AIAssistantPage';
-import AuditLogsPage from './pages/AuditLogsPage';
-import CorrespondancePage from './pages/CorrespondancePage';
-import PresentationPage from './pages/PresentationPage';
 import { Client, Case, Event, Task, Invoice, Avocat, Personnel, Fournisseur, AuditLog, Correspondance } from './types';
 import { MobileMenuModal, MobileTabBar } from './components/MobileMenuStyles';
 import { playAlarmSound, stopAllAlarmSounds } from './utils/audio';
@@ -36,8 +18,6 @@ import {
     syncLocalCollection
 } from './lib/firestoreService';
 import { motion, AnimatePresence } from 'motion/react';
-import EmailComposerModal from './components/modals/EmailComposerModal';
-import { UserProfileModal } from './components/modals/UserProfileModal';
 import { ProtectedGuard } from './components/auth/ProtectedGuard';
 import { syncUsersWithFirestore, updateAppUser, createNewUser, syncAvocatsAndPersonnelsToUsers, getAuthenticatedUserByEmail } from './services/userService';
 import { AppUser, PersonnelCategory } from './types/rbac';
@@ -46,6 +26,29 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 import { safeRemoveItem } from './utils/storageHelper';
 import { isActiveCase, isCaseForClient } from './utils/caseHelpers';
 import { recentFirst } from './utils/recentFirst';
+
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ClientsPage = lazy(() => import('./pages/ClientsPage'));
+const CasesPage = lazy(() => import('./pages/CasesPage'));
+const ProceduresPage = lazy(() => import('./pages/ProceduresPage'));
+const EventsPage = lazy(() => import('./pages/EventsPage'));
+const AgendaPage = lazy(() => import('./pages/AgendaPage'));
+const ChatPage = lazy(() => import('./pages/ChatPage'));
+const BillingPage = lazy(() => import('./pages/BillingPage'));
+const AvocatsPage = lazy(() => import('./pages/AvocatsPage'));
+const PersonnelsPage = lazy(() => import('./pages/PersonnelsPage'));
+const FournisseursPage = lazy(() => import('./pages/FournisseursPage'));
+const GestionPage = lazy(() => import('./pages/GestionPage'));
+const AllInterfacesPage = lazy(() => import('./pages/AllInterfacesPage'));
+const AIAssistantPage = lazy(() => import('./pages/AIAssistantPage'));
+const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
+const CorrespondancePage = lazy(() => import('./pages/CorrespondancePage'));
+const PresentationPage = lazy(() => import('./pages/PresentationPage'));
+const EmailComposerModal = lazy(() => import('./components/modals/EmailComposerModal'));
+const UserProfileModal = lazy(() =>
+    import('./components/modals/UserProfileModal').then(module => ({ default: module.UserProfileModal }))
+);
 
 declare const jspdf: any;
 
@@ -541,9 +544,32 @@ function App() {
             if (cached.length > 0) setCases(cached);
         });
 
+        return () => {
+            unsubClients();
+            unsubCases();
+        };
+    }, [isDbConnected, isAuthenticated]);
+
+    useEffect(() => {
+        if (!isDbConnected || !isAuthenticated) return;
+
         // Staggered loading for secondary collections to avoid network congestion
         const delayedUnsubs: (() => void)[] = [];
-        setTimeout(() => {
+        const pageAliases: Record<string, string> = {
+            'Procédures': 'Procedures',
+            'Procedure': 'Procedures',
+            'Audit': 'AuditLogs',
+            'audit': 'AuditLogs',
+            'journal_audit': 'AuditLogs',
+            'JournalAudit': 'AuditLogs',
+            "Journal d'audit": 'AuditLogs',
+            "Journal d'Audit": 'AuditLogs',
+            'Guide': 'Presentation',
+            'Documentation': 'Presentation'
+        };
+        const activePage = pageAliases[currentPage] || currentPage;
+        const shouldLoad = (...pages: string[]) => pages.includes(activePage) || activePage === 'Gestion' || activePage === 'All';
+        const loadTimer = window.setTimeout(() => {
             // Query initial batch of events with startAfter pagination support
             const eventsQuery = query(collection(db, 'events'), limit(50));
             delayedUnsubs.push(onSnapshot(eventsQuery, (snap) => {
@@ -620,7 +646,7 @@ function App() {
                 if (cached.length > 0) setTasks(cached);
             }));
 
-            delayedUnsubs.push(onSnapshot(collection(db, 'invoices'), (snap) => {
+            if (shouldLoad('Dashboard', 'AIAssistant', 'Clients', 'Dossiers', 'Facturation')) delayedUnsubs.push(onSnapshot(collection(db, 'invoices'), (snap) => {
                 if (snap.metadata.hasPendingWrites) return;
                 const list: Invoice[] = [];
                 snap.forEach(d => {
@@ -698,7 +724,7 @@ function App() {
                 if (cached.length > 0) setPersonnels(cached);
             }));
 
-            delayedUnsubs.push(onSnapshot(collection(db, 'fournisseurs'), (snap) => {
+            if (shouldLoad('Fournisseurs')) delayedUnsubs.push(onSnapshot(collection(db, 'fournisseurs'), (snap) => {
                 if (snap.metadata.hasPendingWrites) return;
                 const list: Fournisseur[] = [];
                 snap.forEach(d => list.push(d.data() as Fournisseur));
@@ -719,7 +745,7 @@ function App() {
                 if (cached.length > 0) setFournisseurs(cached);
             }));
 
-            delayedUnsubs.push(onSnapshot(query(collection(db, 'auditLogs'), limit(40)), (snap) => {
+            if (shouldLoad('AuditLogs')) delayedUnsubs.push(onSnapshot(query(collection(db, 'auditLogs'), limit(40)), (snap) => {
                 if (snap.metadata.hasPendingWrites) return;
                 const list: AuditLog[] = [];
                 snap.forEach(d => list.push(d.data() as AuditLog));
@@ -741,7 +767,7 @@ function App() {
                 if (cached.length > 0) setLogs(cached);
             }));
 
-            delayedUnsubs.push(onSnapshot(query(collection(db, 'correspondances'), limit(250)), (snap) => {
+            if (shouldLoad('Avocats')) delayedUnsubs.push(onSnapshot(query(collection(db, 'correspondances'), limit(250)), (snap) => {
                 if (snap.metadata.hasPendingWrites) return;
                 const list: Correspondance[] = [];
                 snap.forEach(d => list.push(d.data() as Correspondance));
@@ -763,7 +789,7 @@ function App() {
                 if (cached.length > 0) setCorrespondances(cached);
             }));
 
-            delayedUnsubs.push(onSnapshot(query(collection(db, 'presences'), limit(100)), (snap) => {
+            if (shouldLoad('Chat')) delayedUnsubs.push(onSnapshot(query(collection(db, 'presences'), limit(100)), (snap) => {
                 if (snap.metadata.hasPendingWrites) return;
                 const map: { [email: string]: any } = {};
                 snap.forEach((docSnap) => {
@@ -773,14 +799,13 @@ function App() {
             }, (err) => {
                 console.warn("Presences subscription notice (Quota/Offline):", err?.message);
             }));
-        }, 1000);
+        }, 250);
 
         return () => {
-            unsubClients();
-            unsubCases();
+            window.clearTimeout(loadTimer);
             delayedUnsubs.forEach(unsub => unsub());
         };
-    }, [isDbConnected, isAuthenticated]);
+    }, [isDbConnected, isAuthenticated, currentPage]);
 
     // Task reminder observer and notification checker loops
     useEffect(() => {
@@ -1722,7 +1747,11 @@ function App() {
     }
 
     if (!isAuthenticated) {
-        return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+        return (
+            <Suspense fallback={<LoadingSpinner fullScreen message="Chargement de la connexion..." />}>
+                <LoginPage onLoginSuccess={handleLoginSuccess} />
+            </Suspense>
+        );
     }
 
     return (
@@ -1745,7 +1774,9 @@ function App() {
                     isDbConnected={isDbConnected}
                 />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto p-4 sm:p-6 lg:p-8 pb-20 sm:pb-8 custom-scrollbar relative">
-                    {renderPage()}
+                    <Suspense fallback={<LoadingSpinner message="Chargement du module..." />}>
+                        {renderPage()}
+                    </Suspense>
                 </main>
             </div>
 
@@ -1955,32 +1986,40 @@ function App() {
                 )}
             </AnimatePresence>
             
-            <EmailComposerModal 
-                isOpen={emailConfig.isOpen}
-                onClose={() => setEmailConfig(prev => ({ ...prev, isOpen: false }))}
-                defaultTo={emailConfig.to}
-                defaultSubject={emailConfig.subject}
-                defaultBody={emailConfig.body}
-                recipientName={emailConfig.recipientName}
-                attachmentName={emailConfig.attachmentName}
-                contacts={allContacts}
-                onAddToast={triggerToast}
-            />
+            {emailConfig.isOpen && (
+                <Suspense fallback={null}>
+                    <EmailComposerModal
+                        isOpen={emailConfig.isOpen}
+                        onClose={() => setEmailConfig(prev => ({ ...prev, isOpen: false }))}
+                        defaultTo={emailConfig.to}
+                        defaultSubject={emailConfig.subject}
+                        defaultBody={emailConfig.body}
+                        recipientName={emailConfig.recipientName}
+                        attachmentName={emailConfig.attachmentName}
+                        contacts={allContacts}
+                        onAddToast={triggerToast}
+                    />
+                </Suspense>
+            )}
 
-            <UserProfileModal 
-                isOpen={isProfileModalOpen}
-                onClose={() => setIsProfileModalOpen(false)}
-                currentUserInfo={currentUserInfo}
-                currentUserObj={currentUserObj}
-                usersList={usersList}
-                avocats={avocats}
-                personnels={personnels}
-                onUpdateSuccess={(newName, newPhotoUrl) => {
-                    setCurrentUserInfo(prev => prev ? { ...prev, name: newName, photoUrl: newPhotoUrl } : null);
-                    setCurrentUserObj(prev => prev ? { ...prev, fullName: newName, photoUrl: newPhotoUrl } : null);
-                }}
-                onAddToast={triggerToast}
-            />
+            {isProfileModalOpen && (
+                <Suspense fallback={null}>
+                    <UserProfileModal
+                        isOpen={isProfileModalOpen}
+                        onClose={() => setIsProfileModalOpen(false)}
+                        currentUserInfo={currentUserInfo}
+                        currentUserObj={currentUserObj}
+                        usersList={usersList}
+                        avocats={avocats}
+                        personnels={personnels}
+                        onUpdateSuccess={(newName, newPhotoUrl) => {
+                            setCurrentUserInfo(prev => prev ? { ...prev, name: newName, photoUrl: newPhotoUrl } : null);
+                            setCurrentUserObj(prev => prev ? { ...prev, fullName: newName, photoUrl: newPhotoUrl } : null);
+                        }}
+                        onAddToast={triggerToast}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }

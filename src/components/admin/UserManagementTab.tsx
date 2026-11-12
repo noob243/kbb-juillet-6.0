@@ -395,10 +395,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
   };
 
   const isUserArchived = useCallback((user: AppUser) => user.isDeleted === true || user.status === 'Archivé', []);
-  const safeUsersList = useMemo(
-    () => deduplicateAppUsers((users || []).filter(user => Boolean(user.authUid))),
-    [users]
-  );
+  const safeUsersList = useMemo(() => deduplicateAppUsers(users || []), [users]);
   const activeUsers = useMemo(() => safeUsersList.filter(u => !isUserArchived(u)), [safeUsersList, isUserArchived]);
   const archivedUsers = useMemo(() => safeUsersList.filter(isUserArchived), [safeUsersList, isUserArchived]);
 
@@ -421,7 +418,7 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
       {usersLoading && (
         <div role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-800 p-4 text-xs font-medium text-indigo-800 dark:text-indigo-300 flex items-center gap-2">
           <span className="inline-block w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-          Chargement et synchronisation des profils utilisateurs...
+          Chargement et synchronisation des profils utilisateurs... {safeUsersList.length} profil(s) reçu(s).
         </div>
       )}
       {!userCanManageAccounts && (
@@ -1319,6 +1316,15 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
                     </tr>
                   );
                 })}
+                {editUsersPagination.visibleItems.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="p-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                      {usersLoading
+                        ? 'En attente des profils utilisateurs depuis Firestore...'
+                        : 'Aucun compte actif ne correspond à la recherche.'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

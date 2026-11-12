@@ -121,6 +121,11 @@ export async function syncUsersWithFirestore(
       onUpdate(deduplicateAppUsers(Array.from(usersById.values())), false);
     }
   };
+  const notifyLoading = () => {
+    if (isActive) {
+      onUpdate(deduplicateAppUsers(Array.from(usersById.values())), true);
+    }
+  };
   const handleError = (error: Error) => {
     console.error("Users subscription failed:", error);
     if (isActive) onError?.(error);
@@ -160,6 +165,7 @@ export async function syncUsersWithFirestore(
             usersById.set(docSnap.id, { ...user, id: docSnap.id });
           }
         });
+        notifyLoading();
 
         if (page.size < pageSize) break;
         cursor = page.docs[page.docs.length - 1];
