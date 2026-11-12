@@ -91,24 +91,53 @@ exports.syncUserClaims = onDocumentWritten({
 }, async (event) => {
   const after = event.data?.after;
   const before = event.data?.before;
-  if (!after?.exists) {
-    const previousProfile = before?.data();
-    await revokeUserAccess(previousProfile?.authUid);
-    return;
-  }
-
-  const profile = after.data();
-  const email = typeof profile.email === 'string' ? profile.email.trim().toLowerCase() : '';
-  if (!email) {
-    await revokeUserAccess(profile.authUid);
-    return;
-  }
-  const previousProfile = before?.data();
+  const previousProfile = before?.exists ? before.data() : null;
+  const eventProfile = after?.exists ? after.data() : null;
   const previousEmail = typeof previousProfile?.email === 'string'
     ? previousProfile.email.trim().toLowerCase()
     : '';
-  if (previousProfile && previousEmail !== email) {
+  const eventEmail = typeof eventProfile?.email === 'string'
+    ? eventProfile.email.trim().toLowerCase()
+    : '';
+
+  if (previousProfile && eventProfile
+    && previousEmail === eventEmail
+    && previousProfile.authUid === eventProfile.authUid
+    && JSON.stringify(claimsForProfile(previousProfile)) === JSON.stringify(claimsForProfile(eventProfile))
+    && !('password' in eventProfile)
+    && !('tempPassword' in eventProfile)) {
+    return;
+  }
+
+  const profileRef = after?.ref || before?.ref;
+  if (!profileRef) throw new Error(`Missing Firestore reference for user ${event.params.userId}.`);
+  const currentProfileSnapshot = await profileRef.get();
+  if (!currentProfileSnapshot.exists) {
+    await revokeUserAccess(previousProfile?.authUid || eventProfile?.authUid);
+    return;
+  }
+
+  const profile = currentProfileSnapshot.data();
+  const email = typeof profile.email === 'string' ? profile.email.trim().toLowerCase() : '';
+  if (!email) {
+    await revokeUserAccess(profile.authUid);
+    if (previousProfile?.authUid !== profile.authUid) {
+      await revokeUserAccess(previousProfile?.authUid);
+    }
+    return;
+  }
+  if (previousProfile
+    && (previousEmail !== email || previousProfile.authUid !== profile.authUid)) {
     await revokeUserAccess(previousProfile.authUid);
+  }
+
+  if (previousProfile
+    && previousEmail === email
+    && previousProfile.authUid === profile.authUid
+    && JSON.stringify(claimsForProfile(previousProfile)) === JSON.stringify(claimsForProfile(profile))
+    && !('password' in profile)
+    && !('tempPassword' in profile)) {
+    return;
   }
 
   if (!profile.authUid && !isEligibleProfile(profile)) return;
@@ -131,7 +160,7 @@ exports.syncUserClaims = onDocumentWritten({
 
     await auth.setCustomUserClaims(authUser.uid, claimsForProfile(profile));
     if (profile.authUid !== authUser.uid || 'password' in profile || 'tempPassword' in profile) {
-      await after.ref.update({
+      await profileRef.update({
         authUid: authUser.uid,
         password: FieldValue.delete(),
         tempPassword: FieldValue.delete()
