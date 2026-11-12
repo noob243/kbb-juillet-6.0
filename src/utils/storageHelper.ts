@@ -12,6 +12,10 @@ const LOW_PRIORITY_CACHE_KEYS = [
   'kbb_cache_tasks'
 ];
 
+const isLowPriorityCacheKey = (key: string) =>
+  LOW_PRIORITY_CACHE_KEYS.includes(key)
+  || /^kbb_cache_v1_.+_(auditLogs|correspondances|events|tasks)$/.test(key);
+
 /**
  * Safely sets an item in localStorage with quota recovery
  */
@@ -30,7 +34,9 @@ export function safeSetItem(key: string, value: string): boolean {
       console.warn(`[Storage] Quota exceeded when saving key "${key}". Purging non-critical caches...`);
 
       // 1. Evict non-essential caches
-      for (const lowPriorityKey of LOW_PRIORITY_CACHE_KEYS) {
+      const cachedKeys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+        .filter((cacheKey): cacheKey is string => cacheKey !== null && isLowPriorityCacheKey(cacheKey));
+      for (const lowPriorityKey of cachedKeys) {
         if (lowPriorityKey !== key) {
           try {
             localStorage.removeItem(lowPriorityKey);

@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useLayoutEffect, useMemo, useCallback } from 'react';
 
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -14,8 +14,7 @@ import {
     dbCreateDoc, 
     dbUpdateDoc, 
     dbDeleteDoc, 
-    dbCreateAuditLog,
-    syncLocalCollection
+    dbCreateAuditLog
 } from './lib/firestoreService';
 import { motion, AnimatePresence } from 'motion/react';
 import { ProtectedGuard } from './components/auth/ProtectedGuard';
@@ -23,7 +22,7 @@ import { syncUsersWithFirestore, updateAppUser, createNewUser, syncAvocatsAndPer
 import { AppUser, PersonnelCategory } from './types/rbac';
 import { DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from './services/rbacService';
 import LoadingSpinner from './components/common/LoadingSpinner';
-import { safeRemoveItem } from './utils/storageHelper';
+import { safeGetItem, safeRemoveItem, safeSetItem } from './utils/storageHelper';
 import { isActiveCase, isCaseForClient } from './utils/caseHelpers';
 import { recentFirst } from './utils/recentFirst';
 
@@ -52,13 +51,51 @@ const UserProfileModal = lazy(() =>
 
 declare const jspdf: any;
 
-const loadLocalCache = <T,>(key: string): T[] => {
-    safeRemoveItem(key);
-    return [];
+const LOCAL_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const pendingCacheWrites = new Map<string, number>();
+
+const getLocalCacheKey = (userId: string, collectionName: string) =>
+    `kbb_cache_v1_${encodeURIComponent(userId)}_${collectionName}`;
+
+const loadLocalCache = <T,>(userId: string, collectionName: string): T[] => {
+    const key = getLocalCacheKey(userId, collectionName);
+    const storedValue = safeGetItem(key);
+    if (!storedValue) return [];
+
+    try {
+        const cached = JSON.parse(storedValue) as { savedAt?: number; data?: T[] };
+        if (typeof cached.savedAt !== 'number'
+            || !Number.isFinite(cached.savedAt)
+            || Date.now() - cached.savedAt > LOCAL_CACHE_TTL_MS
+            || !Array.isArray(cached.data)) {
+            safeRemoveItem(key);
+            return [];
+        }
+        return cached.data;
+    } catch (error) {
+        console.warn(`Unable to read cached ${collectionName} data:`, error);
+        safeRemoveItem(key);
+        return [];
+    }
 };
 
-const saveLocalCache = <T,>(key: string, _data: T[]) => {
-    safeRemoveItem(key);
+const saveLocalCache = <T,>(userId: string | null, collectionName: string, data: T[]) => {
+    if (!userId) return;
+    const key = getLocalCacheKey(userId, collectionName);
+    const existingTimer = pendingCacheWrites.get(key);
+    if (existingTimer !== undefined) window.clearTimeout(existingTimer);
+
+    const timer = window.setTimeout(() => {
+        pendingCacheWrites.delete(key);
+        const serializedCache = JSON.stringify({
+            savedAt: Date.now(),
+            data
+        }, (_key, value: unknown) =>
+            typeof value === 'string' && /^data:[^;]+;base64,/i.test(value) ? undefined : value
+        );
+        safeSetItem(key, serializedCache);
+    }, 0);
+    pendingCacheWrites.set(key, timer);
 };
 
 const normalizeInvoice = (invoice: Invoice, setCreationDate = false): Invoice => {
@@ -80,6 +117,7 @@ function App() {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [currentUserInfo, setCurrentUserInfo] = useState<{ name: string; role: string; email: string; photoUrl?: string } | null>(null);
     const [currentUserObj, setCurrentUserObj] = useState<AppUser | null>(null);
+    const [cacheUserId, setCacheUserId] = useState<string | null>(null);
     const [usersList, setUsersList] = useState<AppUser[]>([]);
     const [usersLoading, setUsersLoading] = useState(false);
     const [usersSyncError, setUsersSyncError] = useState<string | null>(null);
@@ -138,6 +176,7 @@ function App() {
                 });
             });
             setEvents(newList);
+            saveLocalCache(cacheUserId, 'events', newList);
             setLastEventDoc(lastDoc);
             setHasMoreEvents(snap.docs.length === 50);
         } catch (e) {
@@ -169,7 +208,9 @@ function App() {
                     ...data
                 });
             });
-            setTasks(recentFirst<Task>(newList));
+            const recentTasks = recentFirst<Task>(newList);
+            setTasks(recentTasks);
+            saveLocalCache(cacheUserId, 'tasks', recentTasks);
             setLastTaskDoc(lastDoc);
             setHasMoreTasks(snap.docs.length === 50);
         } catch (e) {
@@ -191,6 +232,7 @@ function App() {
                 setIsAuthenticated(false);
                 setCurrentUserInfo(null);
                 setCurrentUserObj(null);
+                setCacheUserId(null);
                 setIsInitialLoading(false);
                 return;
             }
@@ -202,6 +244,7 @@ function App() {
                     setIsAuthenticated(false);
                     setCurrentUserInfo(null);
                     setCurrentUserObj(null);
+                    setCacheUserId(null);
                     setIsInitialLoading(false);
                     return;
                 }
@@ -212,11 +255,13 @@ function App() {
                     setIsAuthenticated(false);
                     setCurrentUserInfo(null);
                     setCurrentUserObj(null);
+                    setCacheUserId(null);
                     setIsInitialLoading(false);
                     return;
                 }
 
                 setCurrentUserObj(profile);
+                setCacheUserId(firebaseUser.uid);
                 setCurrentUserInfo({
                     name: profile.fullName,
                     role: profile.functionRole || profile.role,
@@ -230,6 +275,7 @@ function App() {
                 setIsAuthenticated(false);
                 setCurrentUserInfo(null);
                 setCurrentUserObj(null);
+                setCacheUserId(null);
             } finally {
                 setIsInitialLoading(false);
             }
@@ -342,6 +388,7 @@ function App() {
                 setIsAuthenticated(false);
                 setCurrentUserInfo(null);
                 setCurrentUserObj(null);
+                setCacheUserId(null);
                 sessionStorage.clear();
                 triggerToast('error', 'Votre session a été fermée à distance par un administrateur.');
             }
@@ -353,17 +400,17 @@ function App() {
     const stopActiveAlarmRef = React.useRef<(() => void) | null>(null);
     
     // Core collection states initialized with local cache for offline/quota resiliency
-    const [clients, setClients] = useState<Client[]>(() => loadLocalCache('kbb_cache_clients'));
-    const [cases, setCases] = useState<Case[]>(() => loadLocalCache('kbb_cache_cases'));
-    const [events, setEvents] = useState<Event[]>(() => loadLocalCache('kbb_cache_events'));
-    const [tasks, setTasks] = useState<Task[]>(() => loadLocalCache('kbb_cache_tasks'));
-    const [invoices, setInvoices] = useState<Invoice[]>(() => loadLocalCache('kbb_cache_invoices'));
+    const [clients, setClients] = useState<Client[]>([]);
+    const [cases, setCases] = useState<Case[]>([]);
+    const [events, setEvents] = useState<Event[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [invoiceSyncError, setInvoiceSyncError] = useState<string | null>(null);
-    const [avocats, setAvocats] = useState<Avocat[]>(() => loadLocalCache('kbb_cache_avocats'));
-    const [personnels, setPersonnels] = useState<Personnel[]>(() => loadLocalCache('kbb_cache_personnels'));
-    const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>(() => loadLocalCache('kbb_cache_fournisseurs'));
-    const [logs, setLogs] = useState<AuditLog[]>(() => loadLocalCache('kbb_cache_auditLogs'));
-    const [correspondances, setCorrespondances] = useState<Correspondance[]>(() => loadLocalCache('kbb_cache_correspondances'));
+    const [avocats, setAvocats] = useState<Avocat[]>([]);
+    const [personnels, setPersonnels] = useState<Personnel[]>([]);
+    const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
+    const [logs, setLogs] = useState<AuditLog[]>([]);
+    const [correspondances, setCorrespondances] = useState<Correspondance[]>([]);
     const [presences, setPresences] = useState<{ [email: string]: any }>({});
 
     const [isDbConnected, setIsDbConnected] = useState(false);
@@ -381,18 +428,33 @@ function App() {
         }
     }, [isDarkMode]);
 
-    useEffect(() => { saveLocalCache('kbb_cache_clients', clients); }, [clients]);
-    useEffect(() => { saveLocalCache('kbb_cache_cases', cases); }, [cases]);
-    useEffect(() => { saveLocalCache('kbb_cache_events', events); }, [events]);
-    useEffect(() => { saveLocalCache('kbb_cache_tasks', tasks); }, [tasks]);
-    useEffect(() => { saveLocalCache('kbb_cache_invoices', invoices); }, [invoices]);
-    useEffect(() => { saveLocalCache('kbb_cache_avocats', avocats); }, [avocats]);
-    useEffect(() => { saveLocalCache('kbb_cache_personnels', personnels); }, [personnels]);
-    useEffect(() => { saveLocalCache('kbb_cache_fournisseurs', fournisseurs); }, [fournisseurs]);
-    useEffect(() => { saveLocalCache('kbb_cache_auditLogs', logs); }, [logs]);
-    useEffect(() => { saveLocalCache('kbb_cache_correspondances', correspondances); }, [correspondances]);
+    useLayoutEffect(() => {
+        if (!cacheUserId) {
+            setClients([]);
+            setCases([]);
+            setEvents([]);
+            setTasks([]);
+            setInvoices([]);
+            setAvocats([]);
+            setPersonnels([]);
+            setFournisseurs([]);
+            setLogs([]);
+            setCorrespondances([]);
+            setPresences({});
+            return;
+        }
 
-
+        setClients(loadLocalCache<Client>(cacheUserId, 'clients'));
+        setCases(loadLocalCache<Case>(cacheUserId, 'cases'));
+        setEvents(loadLocalCache<Event>(cacheUserId, 'events'));
+        setTasks(loadLocalCache<Task>(cacheUserId, 'tasks'));
+        setInvoices(loadLocalCache<Invoice>(cacheUserId, 'invoices'));
+        setAvocats(loadLocalCache<Avocat>(cacheUserId, 'avocats'));
+        setPersonnels(loadLocalCache<Personnel>(cacheUserId, 'personnels'));
+        setFournisseurs(loadLocalCache<Fournisseur>(cacheUserId, 'fournisseurs'));
+        setLogs(loadLocalCache<AuditLog>(cacheUserId, 'auditLogs'));
+        setCorrespondances(loadLocalCache<Correspondance>(cacheUserId, 'correspondances'));
+    }, [cacheUserId]);
 
     const [toasts, setToasts] = useState<{ id: string, type: 'success' | 'error' | 'info' | 'warning', text: string }[]>([]);
     const [confirmModal, setConfirmModal] = useState<{
@@ -482,8 +544,8 @@ function App() {
     useEffect(() => {
         if (!isDbConnected || !isAuthenticated) return;
 
-        const unsubClients = onSnapshot(collection(db, 'clients'), (snap) => {
-            if (snap.metadata.hasPendingWrites) return;
+        const unsubClients = onSnapshot(collection(db, 'clients'), { includeMetadataChanges: true }, (snap) => {
+            if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
             const list: Client[] = [];
             snap.forEach(d => {
                 const data = d.data() as any;
@@ -496,25 +558,14 @@ function App() {
                 });
             });
             list.sort((a, b) => String(a.id).localeCompare(String(b.id)));
-            if (list.length > 0) {
-                setClients(list);
-            } else {
-                const cached = loadLocalCache<Client>('kbb_cache_clients');
-                if (cached.length > 0) {
-                    setClients(cached);
-                    syncLocalCollection('clients', cached);
-                } else {
-                    setClients([]);
-                }
-            }
+            saveLocalCache(cacheUserId, 'clients', list);
+            setClients(list);
         }, (err) => {
             console.warn("Clients subscription notice (Quota/Offline):", err?.message);
-            const cached = loadLocalCache<Client>('kbb_cache_clients');
-            if (cached.length > 0) setClients(cached);
         });
 
-        const unsubCases = onSnapshot(collection(db, 'cases'), (snap) => {
-            if (snap.metadata.hasPendingWrites) return;
+        const unsubCases = onSnapshot(collection(db, 'cases'), { includeMetadataChanges: true }, (snap) => {
+            if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
             const list: Case[] = [];
             snap.forEach(d => {
                 const data = d.data() as any;
@@ -527,28 +578,17 @@ function App() {
                     ...data
                 });
             });
-            if (list.length > 0) {
-                setCases(list);
-            } else {
-                const cached = loadLocalCache<Case>('kbb_cache_cases');
-                if (cached.length > 0) {
-                    setCases(cached);
-                    syncLocalCollection('cases', cached);
-                } else {
-                    setCases([]);
-                }
-            }
+            saveLocalCache(cacheUserId, 'cases', list);
+            setCases(list);
         }, (err) => {
             console.warn("Cases subscription notice (Quota/Offline):", err?.message);
-            const cached = loadLocalCache<Case>('kbb_cache_cases');
-            if (cached.length > 0) setCases(cached);
         });
 
         return () => {
             unsubClients();
             unsubCases();
         };
-    }, [isDbConnected, isAuthenticated]);
+    }, [isDbConnected, isAuthenticated, cacheUserId]);
 
     useEffect(() => {
         if (!isDbConnected || !isAuthenticated) return;
@@ -572,8 +612,8 @@ function App() {
         const loadTimer = window.setTimeout(() => {
             // Query initial batch of events with startAfter pagination support
             const eventsQuery = query(collection(db, 'events'), limit(50));
-            delayedUnsubs.push(onSnapshot(eventsQuery, (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            delayedUnsubs.push(onSnapshot(eventsQuery, { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: Event[] = [];
                 let lastDoc = null;
                 snap.forEach(d => {
@@ -588,29 +628,18 @@ function App() {
                         ...data
                     });
                 });
-                if (list.length > 0) {
-                    setEvents(list);
-                    if (lastDoc) setLastEventDoc(lastDoc);
-                    setHasMoreEvents(snap.docs.length === 50);
-                } else {
-                    const cached = loadLocalCache<Event>('kbb_cache_events');
-                    if (cached.length > 0) {
-                        setEvents(cached);
-                        syncLocalCollection('events', cached);
-                    } else {
-                        setEvents([]);
-                    }
-                }
+                setEvents(list);
+                saveLocalCache(cacheUserId, 'events', list);
+                if (lastDoc) setLastEventDoc(lastDoc);
+                setHasMoreEvents(snap.docs.length === 50);
             }, (err) => {
                 console.warn("Events subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<Event>('kbb_cache_events');
-                if (cached.length > 0) setEvents(cached);
             }));
 
             // Query initial batch of tasks with startAfter pagination support
             const tasksQuery = query(collection(db, 'tasks'), orderBy('id', 'desc'), limit(50));
-            delayedUnsubs.push(onSnapshot(tasksQuery, (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            delayedUnsubs.push(onSnapshot(tasksQuery, { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: Task[] = [];
                 let lastDoc = null;
                 snap.forEach(d => {
@@ -627,27 +656,16 @@ function App() {
                     });
                 });
                 const recentTasks = recentFirst<Task>(list);
-                if (list.length > 0) {
-                    setTasks(recentTasks);
-                    if (lastDoc) setLastTaskDoc(lastDoc);
-                    setHasMoreTasks(snap.docs.length === 50);
-                } else {
-                    const cached = loadLocalCache<Task>('kbb_cache_tasks');
-                    if (cached.length > 0) {
-                        setTasks(recentFirst<Task>(cached));
-                        syncLocalCollection('tasks', cached);
-                    } else {
-                        setTasks([]);
-                    }
-                }
+                setTasks(recentTasks);
+                saveLocalCache(cacheUserId, 'tasks', recentTasks);
+                if (lastDoc) setLastTaskDoc(lastDoc);
+                setHasMoreTasks(snap.docs.length === 50);
             }, (err) => {
                 console.warn("Tasks subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<Task>('kbb_cache_tasks');
-                if (cached.length > 0) setTasks(cached);
             }));
 
-            if (shouldLoad('Dashboard', 'AIAssistant', 'Clients', 'Dossiers', 'Facturation')) delayedUnsubs.push(onSnapshot(collection(db, 'invoices'), (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            if (shouldLoad('Dashboard', 'AIAssistant', 'Clients', 'Dossiers', 'Facturation')) delayedUnsubs.push(onSnapshot(collection(db, 'invoices'), { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: Invoice[] = [];
                 snap.forEach(d => {
                     const data = d.data() as any;
@@ -661,6 +679,7 @@ function App() {
                         status: data.status || 'Non réglée'
                     });
                 });
+                saveLocalCache(cacheUserId, 'invoices', list);
                 setInvoices(list);
                 setInvoiceSyncError(null);
             }, (err) => {
@@ -670,8 +689,8 @@ function App() {
                     : 'Les factures n’ont pas pu être chargées. Vérifiez la connexion puis rechargez la page.');
             }));
 
-            delayedUnsubs.push(onSnapshot(collection(db, 'avocats'), (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            if (shouldLoad('Avocats', 'Dashboard', 'AIAssistant', 'Dossiers')) delayedUnsubs.push(onSnapshot(collection(db, 'avocats'), { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: Avocat[] = [];
                 snap.forEach(d => {
                     const data = d.data() as any;
@@ -686,111 +705,56 @@ function App() {
                         ...data
                     });
                 });
-                if (list.length > 0) {
-                    setAvocats(list);
-                } else {
-                    const cached = loadLocalCache<Avocat>('kbb_cache_avocats');
-                    if (cached.length > 0) {
-                        setAvocats(cached);
-                        syncLocalCollection('avocats', cached);
-                    } else {
-                        setAvocats([]);
-                    }
-                }
+                saveLocalCache(cacheUserId, 'avocats', list);
+                setAvocats(list);
             }, (err) => {
                 console.warn("Avocats subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<Avocat>('kbb_cache_avocats');
-                if (cached.length > 0) setAvocats(cached);
             }));
 
-            delayedUnsubs.push(onSnapshot(collection(db, 'personnels'), (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            if (shouldLoad('Personnels', 'Dashboard')) delayedUnsubs.push(onSnapshot(collection(db, 'personnels'), { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: Personnel[] = [];
                 snap.forEach(d => list.push(d.data() as Personnel));
-                if (list.length > 0) {
-                    setPersonnels(list);
-                } else {
-                    const cached = loadLocalCache<Personnel>('kbb_cache_personnels');
-                    if (cached.length > 0) {
-                        setPersonnels(cached);
-                        syncLocalCollection('personnels', cached);
-                    } else {
-                        setPersonnels([]);
-                    }
-                }
+                saveLocalCache(cacheUserId, 'personnels', list);
+                setPersonnels(list);
             }, (err) => {
                 console.warn("Personnels subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<Personnel>('kbb_cache_personnels');
-                if (cached.length > 0) setPersonnels(cached);
             }));
 
-            if (shouldLoad('Fournisseurs')) delayedUnsubs.push(onSnapshot(collection(db, 'fournisseurs'), (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            if (shouldLoad('Fournisseurs')) delayedUnsubs.push(onSnapshot(collection(db, 'fournisseurs'), { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: Fournisseur[] = [];
                 snap.forEach(d => list.push(d.data() as Fournisseur));
-                if (list.length > 0) {
-                    setFournisseurs(list);
-                } else {
-                    const cached = loadLocalCache<Fournisseur>('kbb_cache_fournisseurs');
-                    if (cached.length > 0) {
-                        setFournisseurs(cached);
-                        syncLocalCollection('fournisseurs', cached);
-                    } else {
-                        setFournisseurs([]);
-                    }
-                }
+                saveLocalCache(cacheUserId, 'fournisseurs', list);
+                setFournisseurs(list);
             }, (err) => {
                 console.warn("Fournisseurs subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<Fournisseur>('kbb_cache_fournisseurs');
-                if (cached.length > 0) setFournisseurs(cached);
             }));
 
-            if (shouldLoad('AuditLogs')) delayedUnsubs.push(onSnapshot(query(collection(db, 'auditLogs'), limit(40)), (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            if (shouldLoad('AuditLogs')) delayedUnsubs.push(onSnapshot(query(collection(db, 'auditLogs'), limit(40)), { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: AuditLog[] = [];
                 snap.forEach(d => list.push(d.data() as AuditLog));
                 list.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-                if (list.length > 0) {
-                    setLogs(list);
-                } else {
-                    const cached = loadLocalCache<AuditLog>('kbb_cache_auditLogs');
-                    if (cached.length > 0) {
-                        setLogs(cached);
-                        syncLocalCollection('auditLogs', cached);
-                    } else {
-                        setLogs([]);
-                    }
-                }
+                saveLocalCache(cacheUserId, 'auditLogs', list);
+                setLogs(list);
             }, (err) => {
                 console.warn("AuditLogs subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<AuditLog>('kbb_cache_auditLogs');
-                if (cached.length > 0) setLogs(cached);
             }));
 
-            if (shouldLoad('Avocats')) delayedUnsubs.push(onSnapshot(query(collection(db, 'correspondances'), limit(250)), (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            if (shouldLoad('Avocats')) delayedUnsubs.push(onSnapshot(query(collection(db, 'correspondances'), limit(250)), { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const list: Correspondance[] = [];
                 snap.forEach(d => list.push(d.data() as Correspondance));
                 list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-                if (list.length > 0) {
-                    setCorrespondances(list);
-                } else {
-                    const cached = loadLocalCache<Correspondance>('kbb_cache_correspondances');
-                    if (cached.length > 0) {
-                        setCorrespondances(cached);
-                        syncLocalCollection('correspondances', cached);
-                    } else {
-                        setCorrespondances([]);
-                    }
-                }
+                saveLocalCache(cacheUserId, 'correspondances', list);
+                setCorrespondances(list);
             }, (err) => {
                 console.warn("Correspondances subscription notice (Quota/Offline):", err?.message);
-                const cached = loadLocalCache<Correspondance>('kbb_cache_correspondances');
-                if (cached.length > 0) setCorrespondances(cached);
             }));
 
-            if (shouldLoad('Chat')) delayedUnsubs.push(onSnapshot(query(collection(db, 'presences'), limit(100)), (snap) => {
-                if (snap.metadata.hasPendingWrites) return;
+            if (shouldLoad('Chat')) delayedUnsubs.push(onSnapshot(query(collection(db, 'presences'), limit(100)), { includeMetadataChanges: true }, (snap) => {
+                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
                 const map: { [email: string]: any } = {};
                 snap.forEach((docSnap) => {
                     map[docSnap.id] = docSnap.data();
@@ -805,7 +769,7 @@ function App() {
             window.clearTimeout(loadTimer);
             delayedUnsubs.forEach(unsub => unsub());
         };
-    }, [isDbConnected, isAuthenticated, currentPage]);
+    }, [isDbConnected, isAuthenticated, currentPage, cacheUserId]);
 
     // Task reminder observer and notification checker loops
     useEffect(() => {
@@ -998,6 +962,7 @@ function App() {
     const handleLoginSuccess = (user: AppUser) => {
         setIsAuthenticated(true);
         setCurrentUserObj(user);
+        setCacheUserId(user.authUid || auth.currentUser?.uid || null);
         const email = user.email.trim().toLowerCase();
         const userInfo = {
             name: user.fullName,
@@ -1045,6 +1010,7 @@ function App() {
         setIsAuthenticated(false);
         setCurrentUserInfo(null);
         setCurrentUserObj(null);
+        setCacheUserId(null);
         setCurrentPage('Dashboard');
         signOut(auth).catch(err => console.error('Unable to sign out from Firebase:', err));
     }, [currentUserInfo]);
