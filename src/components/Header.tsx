@@ -1,6 +1,5 @@
-import React, { FC, useState, useEffect, useRef } from 'react';
+import React, { FC, useState, useEffect, useRef, useMemo } from 'react';
 import { Client, Case, Event } from '../types';
-import firebaseConfigJson from '../../firebase-applet-config.json';
 
 interface HeaderProps {
   searchQuery: string;
@@ -87,32 +86,36 @@ const Header: FC<HeaderProps> = ({
 
   // Filter lists based on input query for the dropdown autocomplete
   const isQueryEmpty = searchQuery.trim() === '';
+  const cleanQuery = useMemo(() => searchQuery.toLowerCase().trim(), [searchQuery]);
   
-  const matchedClients = isQueryEmpty
-    ? []
-    : clients.filter(
-        (c) =>
-          (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (c.contact || '').toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  const matchedClients = useMemo(() => {
+    if (isQueryEmpty) return [];
+    return clients.filter(
+      (c) =>
+        (c.name || '').toLowerCase().includes(cleanQuery) ||
+        (c.contact || '').toLowerCase().includes(cleanQuery)
+    );
+  }, [isQueryEmpty, clients, cleanQuery]);
 
-  const matchedCases = isQueryEmpty
-    ? []
-    : cases.filter(
-        (c) =>
-          (c.id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (c.client || '').toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  const matchedCases = useMemo(() => {
+    if (isQueryEmpty) return [];
+    return cases.filter(
+      (c) =>
+        (c.id || '').toLowerCase().includes(cleanQuery) ||
+        (c.name || '').toLowerCase().includes(cleanQuery) ||
+        (c.client || '').toLowerCase().includes(cleanQuery)
+    );
+  }, [isQueryEmpty, cases, cleanQuery]);
 
-  const matchedEvents = isQueryEmpty
-    ? []
-    : events.filter(
-        (e) =>
-          (e.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (e.type || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (e.lieu || '').toLowerCase().includes(searchQuery.toLowerCase())
-      );
+  const matchedEvents = useMemo(() => {
+    if (isQueryEmpty) return [];
+    return events.filter(
+      (e) =>
+        (e.name || '').toLowerCase().includes(cleanQuery) ||
+        (e.type || '').toLowerCase().includes(cleanQuery) ||
+        (e.lieu || '').toLowerCase().includes(cleanQuery)
+    );
+  }, [isQueryEmpty, events, cleanQuery]);
 
   const hasResults =
     matchedClients.length > 0 || matchedCases.length > 0 || matchedEvents.length > 0;

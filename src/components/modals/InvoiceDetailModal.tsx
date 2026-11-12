@@ -1,6 +1,6 @@
 import React, { FC } from 'react';
 import { Invoice, Case, Client } from '../../types';
-import { X, Mail, Printer, Save, FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { X, Mail, Printer, FileText, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 
 interface InvoiceDetailModalProps {
   isOpen: boolean;

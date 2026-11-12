@@ -1,8 +1,8 @@
-import React, { FC, useState } from 'react';
+import React, { FC, useState, useMemo, useCallback } from 'react';
 import { AppUser, CreateUserPayload, FunctionRole, ModuleKey, PersonnelCategory, UserRole } from '../../types/rbac';
 import { Avocat, Personnel } from '../../types';
-import { ALL_MODULE_PERMISSIONS, DEFAULT_ROLE_PERMISSIONS } from '../../services/rbacService';
-import { createNewUser, restoreUser, softDeleteUser, hardDeleteUser, updateAppUser, updateAppUserAndLinkedRecord } from '../../services/userService';
+import { DEFAULT_ROLE_PERMISSIONS } from '../../services/rbacService';
+import { createNewUser, deduplicateAppUsers, restoreUser, softDeleteUser, hardDeleteUser, updateAppUser, updateAppUserAndLinkedRecord } from '../../services/userService';
 import { PermissionMatrix } from './PermissionMatrix';
 import { dbCreateDoc, sanitizeForFirestore } from '../../lib/firestoreService';
 import { FormField, FormInput, FormSelect } from '../common/FormControls';
@@ -394,17 +394,24 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
     }
   };
 
-  const isUserArchived = (user: AppUser) => user.isDeleted === true || user.status === 'Archivé';
-  const safeUsersList = users || [];
-  const activeUsers = safeUsersList.filter(u => !isUserArchived(u));
-  const archivedUsers = safeUsersList.filter(isUserArchived);
-
-  const query = (searchEditQuery || '').toLowerCase();
-  const filteredActiveUsers = activeUsers.filter(u => 
-    (u.fullName || '').toLowerCase().includes(query) ||
-    (u.email || '').toLowerCase().includes(query) ||
-    (u.functionRole || '').toLowerCase().includes(query)
+  const isUserArchived = useCallback((user: AppUser) => user.isDeleted === true || user.status === 'Archivé', []);
+  const safeUsersList = useMemo(
+    () => deduplicateAppUsers((users || []).filter(user => Boolean(user.authUid))),
+    [users]
   );
+  const activeUsers = useMemo(() => safeUsersList.filter(u => !isUserArchived(u)), [safeUsersList, isUserArchived]);
+  const archivedUsers = useMemo(() => safeUsersList.filter(isUserArchived), [safeUsersList, isUserArchived]);
+
+  const filteredActiveUsers = useMemo(() => {
+    const q = (searchEditQuery || '').toLowerCase().trim();
+    if (!q) return activeUsers;
+    return activeUsers.filter(u => 
+      (u.fullName || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.functionRole || '').toLowerCase().includes(q)
+    );
+  }, [activeUsers, searchEditQuery]);
+
   const editUsersPagination = usePagination(filteredActiveUsers, searchEditQuery);
   const activeUsersPagination = usePagination(activeUsers, activeSubTab);
   const archivedUsersPagination = usePagination(archivedUsers, activeSubTab);
@@ -412,8 +419,9 @@ export const UserManagementTab: FC<UserManagementTabProps> = ({
   return (
     <div className="space-y-6">
       {usersLoading && (
-        <div role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-xs font-medium text-indigo-800">
-          Chargement des profils utilisateur en cours. {users.length} compte(s) déjà chargés.
+        <div role="status" className="rounded-xl border border-indigo-200 bg-indigo-50 dark:bg-indigo-950/40 dark:border-indigo-800 p-4 text-xs font-medium text-indigo-800 dark:text-indigo-300 flex items-center gap-2">
+          <span className="inline-block w-3.5 h-3.5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          Chargement et synchronisation des profils utilisateurs...
         </div>
       )}
       {!userCanManageAccounts && (

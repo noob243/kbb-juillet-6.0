@@ -1,6 +1,6 @@
 import React from 'react';
 import { TaskPriority } from '../../types';
-import { AlertCircle, AlertTriangle, ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Minus } from 'lucide-react';
 
 interface TaskPriorityBadgeProps {
   priority?: TaskPriority | string;

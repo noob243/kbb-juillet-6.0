@@ -3,7 +3,7 @@ import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { ChatIcon } from '../components/Icons';
 import { AppUser } from '../types/rbac';
-import { ArrowLeft, Send, Search, CheckCheck, Clock, Users, Building2, MessageSquare } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { usePagination } from '../hooks/usePagination';
 import PaginationControls from '../components/common/PaginationControls';
 
@@ -45,9 +45,6 @@ interface ChatPageProps {
     currentUserInfo: { name: string; role: string; email: string } | null;
     presences: { [email: string]: any };
 }
-
-const initialDefaultTopics: ForumTopic[] = [
-];
 
 const GENERAL_CHANNEL: ChatContact = {
     name: 'Chat Cabinet',

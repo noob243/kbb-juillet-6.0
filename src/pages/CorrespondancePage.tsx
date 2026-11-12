@@ -33,7 +33,7 @@ const escapeHtml = (value: unknown): string => String(value ?? '')
     .replace(/'/g, '&#39;');
 
 export const CorrespondancePage: FC<CorrespondancePageProps> = ({ 
-    clients, 
+    clients: _clients, 
     cases, 
     avocats, 
     onSendEmail, 

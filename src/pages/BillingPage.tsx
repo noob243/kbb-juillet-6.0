@@ -36,7 +36,6 @@ const BillingPage: FC<BillingPageProps> = ({ invoices = [], dataError, cases = [
     const safeClients = Array.isArray(clients) ? clients : [];
 
     const canAccessCases = hasPermission(currentUser, 'cases');
-    const canAccessClients = hasPermission(currentUser, 'clients');
 
     const getStatusClass = (status: string) => {
         switch (status) {

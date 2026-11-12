@@ -1,7 +1,7 @@
 import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import AvocatModal from '../components/modals/AvocatModal';
-import { PhoneIcon, MailIcon, CalendarIcon, CourthouseIcon, SearchIcon, CheckIcon, AlertIcon } from '../components/Icons';
+import { PhoneIcon, MailIcon, CalendarIcon, CourthouseIcon, SearchIcon } from '../components/Icons';
 import { Avocat, Task, Correspondance } from '../types';
 import { AppUser } from '../types/rbac';
 import { canDeleteRecord } from '../services/rbacService';
@@ -49,7 +49,7 @@ const AvocatsPage: FC<AvocatsPageProps> = ({
     onDeleteAvocat, 
     onSendEmail, 
     correspondances = [],
-    currentUserInfo,
+    currentUserInfo: _currentUserInfo,
     currentUser
 }) => {
     const userCanDelete = canDeleteRecord(currentUser);

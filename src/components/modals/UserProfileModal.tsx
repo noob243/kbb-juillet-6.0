@@ -25,7 +25,7 @@ export const UserProfileModal: FC<UserProfileModalProps> = ({
   onClose,
   currentUserInfo,
   currentUserObj,
-  usersList = [],
+  usersList: _usersList = [],
   avocats = [],
   personnels = [],
   onUpdateSuccess,

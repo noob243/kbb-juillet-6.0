@@ -7,7 +7,6 @@ import { Case, Client, Avocat, Task, Invoice, Correspondance } from '../types';
 import { AppUser } from '../types/rbac';
 import { Download, Eye, Mail, Lock, Unlock, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { isCaseContentMasked, canManageCaseConfidentiality, canViewRestrictedCaseContent } from '../services/rbacService';
-import { DetailedEditModal } from '../components/DetailedEditModal';
 import { exportFicheToPdf } from '../utils/pdfExport';
 
 interface CasesPageProps {
@@ -56,7 +55,6 @@ const CasesPage: FC<CasesPageProps> = ({
     const safeClients = Array.isArray(clients) ? clients : [];
     const safeTasks = Array.isArray(tasks) ? tasks : [];
     const safeInvoices = Array.isArray(invoices) ? invoices : [];
-    const safeAvocats = Array.isArray(avocats) ? avocats : [];
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedCase, setSelectedCase] = useState<Case | null>(null);
@@ -483,6 +481,15 @@ const CasesPage: FC<CasesPageProps> = ({
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        type="button"
+                                        data-pdf-ignore
+                                        onClick={() => handleEmailReport(selectedCase)}
+                                        className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition"
+                                        title="Transmettre le point de situation par e-mail"
+                                    >
+                                        <Mail className="w-4 h-4" /> Rapport Email
+                                    </button>
                                     <button
                                         type="button"
                                         data-pdf-ignore

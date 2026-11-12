@@ -3,7 +3,7 @@ import PageContainer from '../components/PageContainer';
 import TaskModal from '../components/modals/TaskModal';
 import TaskPriorityBadge from '../components/common/TaskPriorityBadge';
 import { CalendarIcon, CheckSquareIcon, FolderIcon, EditIcon, ChartIcon, BellIcon, MapPinIcon } from '../components/Icons';
-import { Task, Case, Avocat, Event, TaskPriority } from '../types';
+import { Task, Case, Avocat, Event } from '../types';
 import { playAlarmSound, stopAllAlarmSounds } from '../utils/audio';
 import { usePagination } from '../hooks/usePagination';
 import PaginationControls from '../components/common/PaginationControls';
@@ -46,7 +46,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
     const [selectedFilterDate, setSelectedFilterDate] = useState<string | null>(null);
     const [selectedTaskForModal, setSelectedTaskForModal] = useState<Task | null>(null);
     const [selectedEventForModal, setSelectedEventForModal] = useState<Event | null>(null);
-    const [prefilledStartDate, setPrefilledStartDate] = useState<string | null>(null);
     const [expandedTaskIds, setExpandedTaskIds] = useState<number[]>([]);
 
     const [editReminderEnabled, setEditReminderEnabled] = useState(false);
@@ -232,11 +231,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
         setCalendarDate(new Date());
     };
 
-    const handleOpenWithPrefilled = (dateStr: string) => {
-        setPrefilledStartDate(dateStr);
-        setIsModalOpen(true);
-    };
-
     const completedTasksCount = tasks.filter(t => t.status === 'Effectué').length;
     const overdueTasksCount = activeTasks.filter(t => isOverdue(t)).length;
     const upcomingTasksCount = activeTasks.filter(t => !isOverdue(t)).length;
@@ -248,7 +242,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                 title="Agenda & Calendrier" 
                 buttonLabel="Ajouter une Tâche" 
                 onButtonClick={() => {
-                    setPrefilledStartDate(null);
                     setIsModalOpen(true);
                 }}
             >
@@ -1044,7 +1037,6 @@ const AgendaPage: FC<AgendaPageProps> = ({ tasks, cases, lawyers, avocats = [], 
                 isOpen={isModalOpen} 
                 onClose={() => {
                     setIsModalOpen(false);
-                    setPrefilledStartDate(null);
                 }} 
                 taskToEdit={null}
                 onSave={(savedTask) => {

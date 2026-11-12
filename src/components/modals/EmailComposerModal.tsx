@@ -1,6 +1,5 @@
 import React, { FC, useState, useEffect, useMemo } from 'react';
-import { Mail, Send, X, Check, Loader2, FileText, Plus, Users, ExternalLink, Trash2, Search, Sparkles, BookOpen, UserPlus } from 'lucide-react';
-import { dbCreateDoc } from '../../lib/firestoreService';
+import { Mail, Send, X, Check, Loader2, FileText, Plus, Users, ExternalLink, Search, Sparkles, BookOpen, UserPlus } from 'lucide-react';
 
 export interface ContactOption {
   name: string;
@@ -36,7 +35,7 @@ const EmailComposerModal: FC<EmailComposerModalProps> = ({
   defaultTo = '',
   defaultSubject = '',
   defaultBody = '',
-  recipientName = '',
+  recipientName: _recipientName = '',
   attachmentName = '',
   contacts = [],
   onAddToast
@@ -59,7 +58,7 @@ const EmailComposerModal: FC<EmailComposerModalProps> = ({
   const [contactSearch, setContactSearch] = useState('');
   
   // History
-  const [sentHistory, setSentHistory] = useState<SentEmailRecord[]>([]);
+  const [_sentHistory, setSentHistory] = useState<SentEmailRecord[]>([]);
 
   // Parse defaultTo into array of emails
   useEffect(() => {

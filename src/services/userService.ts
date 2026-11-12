@@ -1,17 +1,89 @@
 import { AppUser, CreateUserPayload, UserRole, PersonnelCategory } from '../types/rbac';
 import { DEFAULT_ROLE_PERMISSIONS } from './rbacService';
 import { db, createAuthAccountIfPossible } from '../firebase';
-import { collection, doc, setDoc, updateDoc, getDoc, onSnapshot, getDocs, query, where, limit, runTransaction, writeBatch, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, doc, updateDoc, getDoc, onSnapshot, getDocs, query, where, limit, runTransaction, writeBatch, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '../lib/firestoreService';
 import { auth, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 
-function getUserDocumentId(email: string): string {
+export function getUserDocumentId(email: string): string {
   let hash = 14695981039346656037n;
   for (const byte of new TextEncoder().encode(email)) {
     hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 1099511628211n);
   }
   return `user_${hash.toString(16).padStart(16, '0')}`;
+}
+
+export function deduplicateAppUsers(users: AppUser[]): AppUser[] {
+  const usersByEmail = new Map<string, AppUser>();
+  const usersWithoutEmail: AppUser[] = [];
+
+  for (const user of users) {
+    const email = (user.email || '').trim().toLowerCase();
+    if (!email) {
+      if (user.id && user.fullName) {
+        usersWithoutEmail.push(user);
+      }
+      continue;
+    }
+
+    const existing = usersByEmail.get(email);
+    if (!existing) {
+      usersByEmail.set(email, user);
+      continue;
+    }
+
+    // 1. One with authUid (linked to real Firebase Auth) takes precedence
+    const userHasAuth = Boolean(user.authUid);
+    const existingHasAuth = Boolean(existing.authUid);
+    if (userHasAuth && !existingHasAuth) {
+      usersByEmail.set(email, user);
+      continue;
+    }
+    if (!userHasAuth && existingHasAuth) {
+      continue;
+    }
+
+    // 2. Active account over deleted / archived
+    const userActive = user.status === 'Actif' && !user.isDeleted;
+    const existingActive = existing.status === 'Actif' && !existing.isDeleted;
+    if (userActive && !existingActive) {
+      usersByEmail.set(email, user);
+      continue;
+    }
+    if (!userActive && existingActive) {
+      continue;
+    }
+
+    // 3. Admin role over non-admin
+    if (user.role === 'Admin' && existing.role !== 'Admin') {
+      usersByEmail.set(email, user);
+      continue;
+    }
+    if (user.role !== 'Admin' && existing.role === 'Admin') {
+      continue;
+    }
+
+    // 4. Deterministic ID format (user_${hash}) over legacy random ID
+    const userIsDeterministic = user.id === getUserDocumentId(email);
+    const existingIsDeterministic = existing.id === getUserDocumentId(email);
+    if (userIsDeterministic && !existingIsDeterministic) {
+      usersByEmail.set(email, user);
+      continue;
+    }
+    if (!userIsDeterministic && existingIsDeterministic) {
+      continue;
+    }
+
+    // 5. Most recent updatedAt or lastActiveAt
+    const userTime = user.updatedAt || user.lastActiveAt || user.createdAt || '';
+    const existingTime = existing.updatedAt || existing.lastActiveAt || existing.createdAt || '';
+    if (userTime > existingTime) {
+      usersByEmail.set(email, user);
+    }
+  }
+
+  return [...Array.from(usersByEmail.values()), ...usersWithoutEmail];
 }
 
 export async function getAuthenticatedUserByEmail(email: string): Promise<AppUser | null> {
@@ -45,7 +117,9 @@ export async function syncUsersWithFirestore(
   let initialLoadComplete = false;
   let isActive = true;
   const notify = () => {
-    if (initialLoadComplete && isActive) onUpdate(Array.from(usersById.values()), false);
+    if (initialLoadComplete && isActive) {
+      onUpdate(deduplicateAppUsers(Array.from(usersById.values())), false);
+    }
   };
   const handleError = (error: Error) => {
     console.error("Users subscription failed:", error);
@@ -87,15 +161,14 @@ export async function syncUsersWithFirestore(
           }
         });
 
-        if (isActive) onUpdate(Array.from(usersById.values()), true);
         if (page.size < pageSize) break;
         cursor = page.docs[page.docs.length - 1];
       }
       initialLoadComplete = true;
-      if (isActive) onUpdate(Array.from(usersById.values()), false);
+      if (isActive) onUpdate(deduplicateAppUsers(Array.from(usersById.values())), false);
     } catch (error) {
       initialLoadComplete = true;
-      if (isActive) onUpdate(Array.from(usersById.values()), false);
+      if (isActive) onUpdate(deduplicateAppUsers(Array.from(usersById.values())), false);
       handleError(error instanceof Error ? error : new Error(String(error)));
     }
   })();

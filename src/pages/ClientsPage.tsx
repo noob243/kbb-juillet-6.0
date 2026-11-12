@@ -2,22 +2,15 @@ import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import ClientModal from '../components/modals/ClientModal';
 import { 
-  Users, 
   Phone, 
   Mail, 
   Briefcase, 
   Scale, 
-  Calendar, 
   DollarSign, 
   Clock, 
-  ArrowUpRight, 
   TrendingUp, 
   CheckCircle2, 
-  AlertCircle,
-  FileText,
   X,
-  Plus,
-  Bookmark,
   Building2,
   ChevronRight,
   ShieldCheck,
@@ -54,8 +47,6 @@ const ClientsPage: FC<ClientsPageProps> = ({
 }) => {
     const safeClients = Array.isArray(clients) ? clients : [];
     const safeCases = Array.isArray(cases) ? cases : [];
-    const safeInvoices = Array.isArray(invoices) ? invoices : [];
-    const safeTasks = Array.isArray(tasks) ? tasks : [];
     const pagination = usePagination(safeClients);
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -313,7 +304,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                     <div className="p-3.5 bg-slate-50 border border-slate-150/60 rounded-xl">
                                         <span className="text-3xs font-bold text-slate-400 uppercase tracking-widest block">Total Facturé</span>
                                         <span className="text-sm font-black text-slate-800 block mt-1.5 truncate" title={formatCurrency(totalBilled)}>{formatCurrency(totalBilled)}</span>
-                                        <span className="text-[10px] text-slate-400 font-medium block">Total Honoraires</span>
+                                        <span className="text-[10px] text-emerald-600 font-medium block">Réglé : {formatCurrency(totalPaid)}</span>
                                     </div>
                                     <div className="p-3.5 bg-rose-50/50 border border-rose-100/75 rounded-xl">
                                         <span className="text-3xs font-bold text-rose-500 uppercase tracking-widest block">Reste à Recouvrer</span>

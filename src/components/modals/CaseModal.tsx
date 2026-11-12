@@ -1,6 +1,6 @@
 import React, { FC, useState, useEffect, useRef } from 'react';
 import { Case, Client, Avocat, Task, CaseProcedure } from '../../types';
-import { FormField, FormInput, FormSelect, FormTextarea, FormSectionHeader } from '../common/FormControls';
+import { FormField, FormInput, FormSelect } from '../common/FormControls';
 import { exportFicheToPdf } from '../../utils/pdfExport';
 
 interface CaseModalProps {

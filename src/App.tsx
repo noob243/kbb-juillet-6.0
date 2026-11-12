@@ -25,9 +25,8 @@ import { MobileMenuModal, MobileTabBar } from './components/MobileMenuStyles';
 import { playAlarmSound, stopAllAlarmSounds } from './utils/audio';
 
 // Firebase core configuration
-import { db, auth } from './firebase.ts';
+import { db, auth } from './firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import firebaseConfig from '../firebase-applet-config.json';
 import { collection, onSnapshot, doc, setDoc, query, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { 
     dbCreateDoc, 
@@ -35,13 +34,13 @@ import {
     dbDeleteDoc, 
     dbCreateAuditLog,
     syncLocalCollection
-} from './lib/firestoreService.ts';
+} from './lib/firestoreService';
 import { motion, AnimatePresence } from 'motion/react';
 import EmailComposerModal from './components/modals/EmailComposerModal';
 import { UserProfileModal } from './components/modals/UserProfileModal';
 import { ProtectedGuard } from './components/auth/ProtectedGuard';
 import { syncUsersWithFirestore, updateAppUser, createNewUser, syncAvocatsAndPersonnelsToUsers, getAuthenticatedUserByEmail } from './services/userService';
-import { AppUser, ModuleKey, PersonnelCategory } from './types/rbac';
+import { AppUser, PersonnelCategory } from './types/rbac';
 import { DEFAULT_ROLE_PERMISSIONS, canDeleteRecord } from './services/rbacService';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import { safeRemoveItem } from './utils/storageHelper';
@@ -299,18 +298,8 @@ function App() {
         // Mark online immediately
         sendPresenceUpdate();
 
-        // Keep presence current without forcing frequent application-wide user list updates.
+        // Keep presence current with periodic 60s heartbeat
         const heartbeat = setInterval(sendPresenceUpdate, 60000);
-
-        // Throttle user interaction activity listener
-        let lastActivityTime = Date.now();
-        const handleActivity = () => {
-            const now = Date.now();
-            if (now - lastActivityTime > 10000) {
-                lastActivityTime = now;
-                sendPresenceUpdate();
-            }
-        };
 
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
@@ -327,15 +316,11 @@ function App() {
 
         window.addEventListener('beforeunload', handleUnload);
         window.addEventListener('visibilitychange', handleVisibility);
-        window.addEventListener('click', handleActivity);
-        window.addEventListener('keydown', handleActivity);
 
         return () => {
             clearInterval(heartbeat);
             window.removeEventListener('beforeunload', handleUnload);
             window.removeEventListener('visibilitychange', handleVisibility);
-            window.removeEventListener('click', handleActivity);
-            window.removeEventListener('keydown', handleActivity);
         };
     }, [isAuthenticated, currentUserObj?.id]);
 
@@ -379,8 +364,6 @@ function App() {
     const [presences, setPresences] = useState<{ [email: string]: any }>({});
 
     const [isDbConnected, setIsDbConnected] = useState(false);
-    const [isSyncComplete, setIsSyncComplete] = useState(false);
-    const [isSyncing, setIsSyncing] = useState(false);
     const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -790,8 +773,6 @@ function App() {
             }, (err) => {
                 console.warn("Presences subscription notice (Quota/Offline):", err?.message);
             }));
-            
-            setIsSyncComplete(true);
         }, 1000);
 
         return () => {
@@ -973,14 +954,19 @@ function App() {
         };
     }, [isAuthenticated, currentUserInfo, isDbConnected]);
 
-    // Automatically sync and provision existing Avocats and Personnels into the users collection with valid passwords
+    // Automatically sync and provision existing Avocats and Personnels into the users collection once users are loaded
+    const hasProvisionedUsersRef = React.useRef(false);
     useEffect(() => {
-        if (isDbConnected && (avocats.length > 0 || personnels.length > 0)) {
-            syncAvocatsAndPersonnelsToUsers(avocats, personnels, usersList).catch(err => {
-                console.warn("Notice during background sync of users:", err);
-            });
-        }
-    }, [isDbConnected, avocats.length, personnels.length]);
+        if (!isDbConnected || usersLoading || hasProvisionedUsersRef.current) return;
+        if (currentUserObj?.role !== 'Admin') return;
+        if (avocats.length === 0 && personnels.length === 0) return;
+        if (usersList.length === 0) return;
+
+        hasProvisionedUsersRef.current = true;
+        syncAvocatsAndPersonnelsToUsers(avocats, personnels, usersList).catch(err => {
+            console.warn("Notice during background sync of users:", err);
+        });
+    }, [isDbConnected, usersLoading, currentUserObj?.role, avocats, personnels, usersList]);
 
     const lawyerNames = avocats.map((a) => a.fullName);
 
@@ -1658,13 +1644,6 @@ function App() {
         (e.lieu || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    const isAssocietOrAdmin = () => {
-        const roleObj = currentUserObj?.role?.toLowerCase() || '';
-        const roleInfo = currentUserInfo?.role?.toLowerCase() || '';
-        const combined = `${roleObj} ${roleInfo}`;
-        return combined.includes('admin') || combined.includes('directeur') || combined.includes('associé') || combined.includes('partner') || combined.includes('associet') || currentUserObj?.role === 'Admin';
-    };
-
     const renderPage = () => {
         const pageProps = {
             clients: filteredClients, 
@@ -1727,7 +1706,7 @@ function App() {
             case 'JournalAudit':
             case "Journal d'audit":
             case "Journal d'Audit":
-                return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="audit"><AuditLogsPage logs={logs || []} currentUser={currentUserObj} onAddToast={triggerToast} /></ProtectedGuard>;
+                return <ProtectedGuard user={currentUserObj} currentUserInfo={currentUserInfo} moduleKey="audit"><AuditLogsPage logs={logs || []} users={usersList} currentUser={currentUserObj} onAddToast={triggerToast} /></ProtectedGuard>;
             case 'Presentation':
             case 'presentation':
             case 'Guide':

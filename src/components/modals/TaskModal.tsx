@@ -1,7 +1,7 @@
 import React, { FC, useState, useRef, useEffect } from 'react';
 import { Task, Case, Avocat, TaskPriority } from '../../types';
 import { playAlarmSound, stopAllAlarmSounds } from '../../utils/audio';
-import { FormField, FormInput, FormSelect, FormTextarea, FormSectionHeader } from '../common/FormControls';
+import { FormField, FormInput, FormSelect, FormTextarea } from '../common/FormControls';
 
 interface TaskModalProps {
   isOpen: boolean;

@@ -1,8 +1,7 @@
 import React, { FC, useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
-import { CabinetSettings, UserRole } from '../../types/rbac';
-import firebaseConfigJson from '../../../firebase-applet-config.json';
+import { CabinetSettings } from '../../types/rbac';
 
 interface CabinetManagementTabProps {
   onAddToast: (type: 'success' | 'error', message: string) => void;

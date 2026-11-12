@@ -1,6 +1,6 @@
 
-import React, { FC, useState, useEffect } from 'react';
-import { Icon, DashboardIcon, ClientsIcon, CasesIcon, EventsIcon, AgendaIcon, ChatIcon, BillingIcon, AvocatsIcon, StaffIcon, PersonnelsIcon, SuppliersIcon, LogoutIcon, EyeIcon, AIIcon } from './Icons';
+import React, { FC, useState, useEffect, useMemo } from 'react';
+import { Icon, DashboardIcon, ClientsIcon, CasesIcon, AgendaIcon, ChatIcon, BillingIcon, AvocatsIcon, StaffIcon, PersonnelsIcon, SuppliersIcon, LogoutIcon, AIIcon } from './Icons';
 import { AppUser, ModuleKey, UserRole } from '../types/rbac';
 import { hasPermission, DEFAULT_ROLE_PERMISSIONS, canViewPresentation, canAccessBilling } from '../services/rbacService';
 
@@ -52,15 +52,10 @@ const Sidebar: FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout, curr
         'AuditLogs': 'audit'
     };
 
-    const isAllowedItem = (pageName: string): boolean => {
-        if (pageName === 'All') {
-            return activeUser ? activeUser.role === 'Admin' : (currentUserInfo?.role ? currentUserInfo.role.toLowerCase().includes('admin') : false);
-        }
-
-        const moduleKey = routeToModuleMap[pageName];
-        if (!moduleKey) return true;
-
-        const effectiveUser = activeUser || (currentUserInfo ? {
+    const effectiveUser = useMemo(() => {
+        if (activeUser) return activeUser;
+        if (!currentUserInfo) return null;
+        return {
             id: 'temp',
             email: currentUserInfo.email,
             fullName: currentUserInfo.name,
@@ -70,10 +65,19 @@ const Sidebar: FC<SidebarProps> = ({ currentPage, setCurrentPage, onLogout, curr
             status: 'Actif' as const,
             permissions: DEFAULT_ROLE_PERMISSIONS[currentUserInfo.role as UserRole] || [],
             hasAppAccess: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            createdAt: '',
+            updatedAt: '',
             isDeleted: false
-        } : null) as any;
+        } as any;
+    }, [activeUser, currentUserInfo]);
+
+    const isAllowedItem = (pageName: string): boolean => {
+        if (pageName === 'All') {
+            return activeUser ? activeUser.role === 'Admin' : (currentUserInfo?.role ? currentUserInfo.role.toLowerCase().includes('admin') : false);
+        }
+
+        const moduleKey = routeToModuleMap[pageName];
+        if (!moduleKey) return true;
 
         if (pageName === 'Presentation') {
             return canViewPresentation(effectiveUser);

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Client, Case, Avocat, Personnel, Event, EventReport } from '../types';
+import { Client, Avocat, Event, EventReport } from '../types';
 import { compressAndOptimizeImage, validateImageFile, ACCEPTED_IMAGE_INPUT_ACCEPT } from '../utils/imageOptimizer';
 import { exportFicheToPdf } from '../utils/pdfExport';
 import { getEventDescription } from '../utils/eventHelpers';

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { recentFirst } from '../utils/recentFirst';
 
 export const PAGE_SIZE = 10;
@@ -7,7 +7,7 @@ export const usePagination = <T,>(items: T[], resetKey?: string | number) => {
     const [currentPage, setCurrentPage] = useState(1);
     const pageCount = Math.ceil(items.length / PAGE_SIZE);
     const startIndex = (currentPage - 1) * PAGE_SIZE;
-    const sortedItems = recentFirst<T>(items);
+    const sortedItems = useMemo(() => recentFirst<T>(items), [items]);
 
     useEffect(() => {
         setCurrentPage(1);

@@ -12,16 +12,13 @@ import {
   FileSpreadsheet, 
   User, 
   Clock,
-  Briefcase,
   Layers,
   HelpCircle,
   Wifi,
   LogOut,
-  ShieldCheck,
   Laptop,
   Radio,
   UserX,
-  XCircle,
   Download
 } from 'lucide-react';
 import { AuditLog } from '../types';
@@ -34,11 +31,12 @@ import PaginationControls from '../components/common/PaginationControls';
 interface AuditLogsPageProps {
   logs: AuditLog[];
   currentUser?: AppUser | null;
+  users?: AppUser[];
   onAddToast?: (type: 'success' | 'error', message: string) => void;
   onClearLogs?: () => void; // Optional if ever needed
 }
 
-const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddToast }) => {
+const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, users: initialUsers, onAddToast }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [actionFilter, setActionFilter] = useState<string>('all');
     const [moduleFilter, setModuleFilter] = useState<string>('all');
@@ -46,12 +44,20 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
     const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
     // Users and active sessions state
-    const [usersList, setUsersList] = useState<AppUser[]>([]);
+    const [usersList, setUsersList] = useState<AppUser[]>(() => initialUsers || []);
     const [disconnectingUserId, setDisconnectingUserId] = useState<string | null>(null);
     const [showDisconnectConfirm, setShowDisconnectConfirm] = useState<AppUser | null>(null);
 
-    // Subscribe to Firestore users list
+    // Keep users in sync with prop if passed
     useEffect(() => {
+        if (initialUsers && initialUsers.length > 0) {
+            setUsersList(initialUsers);
+        }
+    }, [initialUsers]);
+
+    // Subscribe to Firestore users list only if not passed from parent
+    useEffect(() => {
+        if (initialUsers && initialUsers.length > 0) return;
         let active = true;
         let unsub: (() => void) | undefined;
         syncUsersWithFirestore((latest) => {
@@ -67,7 +73,7 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, onAddTo
             active = false;
             if (unsub) unsub();
         };
-    }, []);
+    }, [initialUsers]);
 
     // Periodic tick to refresh presence state dynamically every 10 seconds
     const [currentTime, setCurrentTime] = useState<number>(Date.now());
