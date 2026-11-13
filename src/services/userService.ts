@@ -1,7 +1,7 @@
 import { AppUser, CreateUserPayload, UserRole, PersonnelCategory } from '../types/rbac';
 import { DEFAULT_ROLE_PERMISSIONS } from './rbacService';
 import { db, createAuthAccountIfPossible } from '../firebase';
-import { collection, doc, updateDoc, getDoc, onSnapshot, getDocs, query, where, limit, runTransaction, writeBatch, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, deleteDoc, getDoc, onSnapshot, getDocs, query, where, limit, runTransaction, writeBatch, orderBy, documentId, startAfter, QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
 import { sanitizeForFirestore } from '../lib/firestoreService';
 import { auth, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -91,15 +91,88 @@ export async function getAuthenticatedUserByEmail(email: string): Promise<AppUse
   if (!auth.currentUser || auth.currentUser.email?.toLowerCase() !== cleanEmail) {
     throw new Error('Une session Firebase correspondante est requise.');
   }
+
+  // 1. Search by authUid
   const userSnapshot = await getDocs(query(
     collection(db, 'users'),
     where('authUid', '==', auth.currentUser.uid),
     limit(1)
   ));
-  const userDocument = userSnapshot.docs[0];
+  let userDocument = userSnapshot.docs[0];
+
+  // 2. Fallback search by email
+  if (!userDocument) {
+    const emailSnapshot = await getDocs(query(
+      collection(db, 'users'),
+      where('email', '==', cleanEmail),
+      limit(1)
+    ));
+    userDocument = emailSnapshot.docs[0];
+
+    if (userDocument) {
+      try {
+        await updateDoc(doc(db, 'users', userDocument.id), {
+          authUid: auth.currentUser.uid
+        });
+      } catch (e) {
+        console.warn("Could not auto-link authUid:", e);
+      }
+    }
+  }
+
+  // 3. Auto-provision Admin profile for joemakkmj@gmail.com if missing
+  if (!userDocument && cleanEmail === 'joemakkmj@gmail.com') {
+    try {
+      const adminUser: AppUser = {
+        id: getUserDocumentId(cleanEmail),
+        authUid: auth.currentUser.uid,
+        email: cleanEmail,
+        fullName: 'Joe Mak (Admin)',
+        role: 'Admin',
+        userType: 'Avocat',
+        functionRole: 'Administrateur Principal',
+        hasAppAccess: true,
+        permissions: DEFAULT_ROLE_PERMISSIONS.Admin,
+        canDelete: true,
+        isSuperAdmin: true,
+        status: 'Actif',
+        isDeleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'users', adminUser.id), sanitizeForFirestore(adminUser));
+      return adminUser;
+    } catch (err) {
+      console.error("Could not auto-create admin profile for joemakkmj@gmail.com:", err);
+    }
+  }
+
   if (!userDocument) return null;
   const user = userDocument.data() as AppUser;
-  return { ...user, id: userDocument.id };
+  const resolvedUser: AppUser = { ...user, id: userDocument.id };
+
+  // Enforce Admin role for joemakkmj@gmail.com
+  if (cleanEmail === 'joemakkmj@gmail.com' && (resolvedUser.role !== 'Admin' || !resolvedUser.isSuperAdmin)) {
+    resolvedUser.role = 'Admin';
+    resolvedUser.isSuperAdmin = true;
+    resolvedUser.canDelete = true;
+    resolvedUser.status = 'Actif';
+    resolvedUser.isDeleted = false;
+    resolvedUser.hasAppAccess = true;
+    resolvedUser.permissions = DEFAULT_ROLE_PERMISSIONS.Admin;
+
+    updateAppUser(resolvedUser.id, {
+      role: 'Admin',
+      isSuperAdmin: true,
+      canDelete: true,
+      status: 'Actif',
+      isDeleted: false,
+      hasAppAccess: true,
+      permissions: DEFAULT_ROLE_PERMISSIONS.Admin
+    }).catch(() => {});
+  }
+
+  return resolvedUser;
 }
 
 export async function syncUsersWithFirestore(
