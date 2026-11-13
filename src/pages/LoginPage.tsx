@@ -93,8 +93,17 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     <p className="text-center text-sm text-gray-500 dark:text-slate-400 mb-6">Connectez-vous à votre espace cabinet</p>
                     
                     {errorMsg && (
-                        <div className="mb-5 p-3.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-400 rounded-xl text-xs font-semibold animate-fadeIn">
-                            ⚠️ {errorMsg}
+                        <div className="mb-5 p-3.5 bg-rose-50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-400 rounded-xl text-xs font-semibold animate-fadeIn flex flex-col gap-2">
+                            <div>⚠️ {errorMsg}</div>
+                            {email.trim() && (
+                                <button
+                                    type="button"
+                                    onClick={handlePasswordRecovery}
+                                    className="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 hover:underline text-left cursor-pointer border-t border-rose-200/60 dark:border-rose-800/60 pt-2 mt-1"
+                                >
+                                    🔑 Définir / Réinitialiser le mot de passe pour {email.trim()}
+                                </button>
+                            )}
                         </div>
                     )}
 
