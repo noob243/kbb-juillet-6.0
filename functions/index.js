@@ -460,3 +460,42 @@ exports.checkScheduledTaskReminders = onSchedule('every 1 hours', async () => {
     console.error('[Scheduled Task Check Error]', err);
   }
 });
+
+exports.purgeOldAuditLogs = onSchedule({
+  schedule: 'every day 02:00',
+  timeZone: 'Etc/UTC',
+  timeoutSeconds: 540
+}, async () => {
+  const cutoff = new Date();
+  const dayOfMonth = cutoff.getUTCDate();
+  cutoff.setUTCDate(1);
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - 3);
+  const lastDayOfCutoffMonth = new Date(Date.UTC(
+    cutoff.getUTCFullYear(),
+    cutoff.getUTCMonth() + 1,
+    0
+  )).getUTCDate();
+  cutoff.setUTCDate(Math.min(dayOfMonth, lastDayOfCutoffMonth));
+  const cutoffTimestamp = cutoff.toISOString();
+  const batchSize = 400;
+  let purgedCount = 0;
+
+  while (true) {
+    const expiredLogs = await firestore.collection('auditLogs')
+      .where('timestamp', '<', cutoffTimestamp)
+      .orderBy('timestamp')
+      .limit(batchSize)
+      .get();
+
+    if (expiredLogs.empty) break;
+
+    const batch = firestore.batch();
+    expiredLogs.docs.forEach(log => batch.delete(log.ref));
+    await batch.commit();
+    purgedCount += expiredLogs.size;
+  }
+
+  if (purgedCount > 0) {
+    console.log(`[AuditLog Purge] Purged ${purgedCount} audit log(s) older than 3 months.`);
+  }
+});

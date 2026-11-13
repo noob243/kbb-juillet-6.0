@@ -54,6 +54,25 @@ declare const jspdf: any;
 const LOCAL_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const pendingCacheWrites = new Map<string, number>();
 
+const getAuditLogCutoff = () => {
+    const cutoff = new Date();
+    const dayOfMonth = cutoff.getUTCDate();
+    cutoff.setUTCDate(1);
+    cutoff.setUTCMonth(cutoff.getUTCMonth() - 3);
+    const lastDayOfCutoffMonth = new Date(Date.UTC(
+        cutoff.getUTCFullYear(),
+        cutoff.getUTCMonth() + 1,
+        0
+    )).getUTCDate();
+    cutoff.setUTCDate(Math.min(dayOfMonth, lastDayOfCutoffMonth));
+    return cutoff.getTime();
+};
+
+const isWithinAuditRetention = (log: AuditLog, cutoff: number) => {
+    const timestamp = log.timestamp ? new Date(log.timestamp).getTime() : Number.NaN;
+    return !Number.isFinite(timestamp) || timestamp >= cutoff;
+};
+
 const getLocalCacheKey = (userId: string, collectionName: string) =>
     `kbb_cache_v1_${encodeURIComponent(userId)}_${collectionName}`;
 
@@ -441,7 +460,8 @@ function App() {
         setAvocats(loadLocalCache<Avocat>(cacheUserId, 'avocats'));
         setPersonnels(loadLocalCache<Personnel>(cacheUserId, 'personnels'));
         setFournisseurs(loadLocalCache<Fournisseur>(cacheUserId, 'fournisseurs'));
-        setLogs(loadLocalCache<AuditLog>(cacheUserId, 'auditLogs'));
+        setLogs(loadLocalCache<AuditLog>(cacheUserId, 'auditLogs')
+            .filter(log => isWithinAuditRetention(log, getAuditLogCutoff())));
         setCorrespondances(loadLocalCache<Correspondance>(cacheUserId, 'correspondances'));
     }, [cacheUserId]);
 
@@ -720,16 +740,22 @@ function App() {
                 console.warn("Fournisseurs subscription notice (Quota/Offline):", err?.message);
             }));
 
-            if (shouldLoad('AuditLogs')) delayedUnsubs.push(onSnapshot(query(collection(db, 'auditLogs'), limit(40)), { includeMetadataChanges: true }, (snap) => {
-                if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;
-                const list: AuditLog[] = [];
-                snap.forEach(d => list.push(d.data() as AuditLog));
-                list.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''));
-                saveLocalCache(cacheUserId, 'auditLogs', list);
-                setLogs(list);
-            }, (err) => {
-                console.warn("AuditLogs subscription notice (Quota/Offline):", err?.message);
-            }));
+            if (shouldLoad('AuditLogs')) delayedUnsubs.push(onSnapshot(
+                query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(300)),
+                (snap) => {
+                    const cutoff = getAuditLogCutoff();
+                    const list: AuditLog[] = [];
+                    snap.forEach(d => {
+                        const data = d.data() as AuditLog;
+                        if (isWithinAuditRetention(data, cutoff)) list.push(data);
+                    });
+                    saveLocalCache(cacheUserId, 'auditLogs', list);
+                    setLogs(list);
+                },
+                (err) => {
+                    console.warn("AuditLogs subscription notice (Quota/Offline):", err?.message);
+                }
+            ));
 
             if (shouldLoad('Avocats')) delayedUnsubs.push(onSnapshot(query(collection(db, 'correspondances'), limit(250)), { includeMetadataChanges: true }, (snap) => {
                 if (snap.metadata.hasPendingWrites || snap.metadata.fromCache) return;

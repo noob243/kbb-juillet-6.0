@@ -332,7 +332,7 @@ const AuditLogsPage: FC<AuditLogsPageProps> = ({ logs = [], currentUser, users: 
                         </h1>
                     </div>
                     <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 font-medium">
-                        Historique complet et traçabilité de toutes les actions effectuées dans l'application.
+                        Historique synchronisé en direct ; les actions sont conservées pendant trois mois.
                     </p>
                 </div>
 
