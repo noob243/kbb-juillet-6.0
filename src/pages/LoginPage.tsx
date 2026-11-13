@@ -48,23 +48,7 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
         const cleanEmail = email.trim();
         try {
-            const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
-            if (!credential.user.emailVerified) {
-                await sendEmailVerification(credential.user);
-                await signOut(auth);
-                setErrorMsg('Vérifiez votre adresse e-mail via le lien envoyé avant de vous connecter.');
-                return;
-            }
-
-            await credential.user.getIdToken(true);
-            const resolveProfile = httpsCallable(functions, 'resolveAuthenticatedUserProfile');
-            await resolveProfile();
-            const token = await credential.user.getIdTokenResult(true);
-            if (token.claims.appAccess !== true || token.claims.isDeleted === true) {
-                await signOut(auth);
-                setErrorMsg("Ce compte n'a pas d'accès applicatif actif. Contactez l'administrateur.");
-                return;
-            }
+            await signInWithEmailAndPassword(auth, cleanEmail, password);
 
             const user = await getAuthenticatedUserByEmail(cleanEmail);
             if (!user || user.status !== 'Actif' || user.isDeleted || user.hasAppAccess === false) {
@@ -77,13 +61,12 @@ const LoginPage: FC<LoginPageProps> = ({ onLoginSuccess }) => {
         } catch (err: any) {
             console.error("Login attempt failed:", err?.code || err);
             const errorCode = String(err?.code || '');
-            const functionError = errorCode.startsWith('functions/');
             setErrorMsg(
-                errorCode === 'auth/invalid-credential' || errorCode === 'auth/user-not-found'
+                errorCode === 'auth/invalid-credential' || errorCode === 'auth/wrong-password' || errorCode === 'auth/user-not-found'
                     ? 'Adresse e-mail ou mot de passe incorrect.'
-                    : functionError
-                        ? err?.message || 'Impossible de vérifier les droits de ce compte. Contactez un administrateur.'
-                        : 'Impossible de se connecter. Vérifiez vos identifiants et réessayez.'
+                    : errorCode === 'auth/too-many-requests'
+                        ? 'Accès temporairement bloqué en raison de tentatives répétés. Réessayez plus tard.'
+                        : 'Impossible de se connecter. Vérifiez vos identifiants et votre mot de passe.'
             );
         } finally {
             setIsLoading(false);

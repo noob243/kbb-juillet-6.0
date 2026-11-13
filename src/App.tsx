@@ -238,17 +238,6 @@ function App() {
             }
 
             try {
-                const tokenResult = await firebaseUser.getIdTokenResult(true);
-                if (!firebaseUser.emailVerified || tokenResult.claims.appAccess !== true || tokenResult.claims.isDeleted === true) {
-                    await signOut(auth);
-                    setIsAuthenticated(false);
-                    setCurrentUserInfo(null);
-                    setCurrentUserObj(null);
-                    setCacheUserId(null);
-                    setIsInitialLoading(false);
-                    return;
-                }
-
                 const profile = await getAuthenticatedUserByEmail(firebaseUser.email || '');
                 if (!profile || profile.status !== 'Actif' || profile.isDeleted || profile.hasAppAccess === false) {
                     await signOut(auth);
