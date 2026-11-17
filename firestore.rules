@@ -27,6 +27,12 @@ service cloud.firestore {
       return id is string && id.matches('^[A-Za-z0-9_-]{1,128}$');
     }
 
+    function validCorrespondenceId(id) {
+      return validId(id)
+        || (id is string && id.size() <= 128
+          && id.matches('^KBB - .+ - [0-9]{4} - [0-9]+$'));
+    }
+
     match /auditLogs/{logId} {
       allow get, list: if hasPermission('audit');
       allow create: if isVerifiedMember()
@@ -61,14 +67,14 @@ service cloud.firestore {
     }
 
     match /clients/{id} {
-      allow read: if hasPermission('clients');
-      allow create, update: if hasPermission('clients') && validId(id);
+      allow read: if isVerifiedMember();
+      allow create, update: if isVerifiedMember() && validId(id);
       allow delete: if canDelete('clients') && validId(id);
     }
 
     match /cases/{id} {
-      allow read: if hasPermission('cases');
-      allow create, update: if hasPermission('cases') && validId(id);
+      allow read: if isVerifiedMember();
+      allow create, update: if isVerifiedMember() && validId(id);
       allow delete: if canDelete('cases') && validId(id);
     }
 
@@ -123,8 +129,12 @@ service cloud.firestore {
 
     match /correspondances/{id} {
       allow read: if hasPermission('correspondance');
-      allow create, update: if hasPermission('correspondance') && validId(id);
-      allow delete: if canDelete('correspondance') && validId(id);
+      allow create, update: if hasPermission('correspondance') && validCorrespondenceId(id);
+      allow delete: if canDelete('correspondance') && validCorrespondenceId(id);
+    }
+
+    match /correspondance_sequences/{year} {
+      allow read, write: if hasPermission('correspondance') && validId(year);
     }
 
     match /chat_messages/{id} {

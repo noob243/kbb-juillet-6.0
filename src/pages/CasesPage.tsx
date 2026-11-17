@@ -3,9 +3,10 @@ import React, { FC, useEffect, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import CaseModal from '../components/modals/CaseModal';
 import InvoiceDetailModal from '../components/modals/InvoiceDetailModal';
+import { DetailedEditModal } from '../components/DetailedEditModal';
 import { Case, Client, Avocat, Task, Invoice, Correspondance } from '../types';
 import { AppUser } from '../types/rbac';
-import { Download, Eye, Mail, Lock, Unlock, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Download, Eye, Mail, Lock, Unlock, ShieldAlert, ShieldCheck, Pencil } from 'lucide-react';
 import { isCaseContentMasked, canManageCaseConfidentiality, canViewRestrictedCaseContent } from '../services/rbacService';
 import { exportFicheToPdf } from '../utils/pdfExport';
 
@@ -58,6 +59,7 @@ const CasesPage: FC<CasesPageProps> = ({
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+    const [editingCase, setEditingCase] = useState<Case | null>(null);
     const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
     const [currentPage, setCurrentPage] = useState(1);
     const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
@@ -308,6 +310,15 @@ const CasesPage: FC<CasesPageProps> = ({
                                                 >
                                                     Gérer
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingCase(c)}
+                                                    className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-700 bg-slate-50 hover:bg-indigo-50 px-2.5 py-1.5 rounded-xl transition cursor-pointer border border-slate-100 text-xs font-bold"
+                                                    title={`Modifier ${c.name}`}
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                    Modifier
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -347,6 +358,21 @@ const CasesPage: FC<CasesPageProps> = ({
             </PageContainer>
             
             <CaseModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={onAddCase} clients={clients} avocats={avocats} cases={cases} />
+            {editingCase && (
+                <DetailedEditModal
+                    type="case"
+                    item={editingCase}
+                    clients={clients}
+                    avocats={avocats}
+                    canEditCaseConfidentiality={canManageCaseConfidentiality(activeUser, editingCase)}
+                    onClose={() => setEditingCase(null)}
+                    onSave={(updated) => {
+                        onUpdateCase?.(updated);
+                        setSelectedCase(updated);
+                        setEditingCase(null);
+                    }}
+                />
+            )}
 
             {/* Case Details / Management Modal */}
             {selectedCase && (() => {

@@ -11,6 +11,7 @@ interface DetailedEditModalProps {
   avocats: Avocat[];
   onClose: () => void;
   onSave: (updatedItem: any) => void;
+  canEditCaseConfidentiality?: boolean;
 }
 
 export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
@@ -19,7 +20,8 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
   clients,
   avocats,
   onClose,
-  onSave
+  onSave,
+  canEditCaseConfidentiality = true
 }) => {
   const [formData, setFormData] = useState<any>(() => {
     // Deep clone to avoid mutating item reference during active session editing
@@ -880,10 +882,11 @@ export const DetailedEditModal: React.FC<DetailedEditModalProps> = ({
                 {renderLawyerSelector('avocatTitulaire', 'Avocat(s) Titulaire(s)', 'Choisir les titulaires...')}
                 {renderLawyerSelector('avocatsSurDossier', 'Avocat(s) Associé(s) / Rattaché(s)', 'Choisir les avocats associés...')}
                 <div className="md:col-span-2 p-3.5 bg-amber-50/70 border border-amber-250 rounded-xl">
-                  <label className="flex items-start gap-2.5 cursor-pointer">
+                  <label className={`flex items-start gap-2.5 ${canEditCaseConfidentiality ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
                     <input
                       type="checkbox"
                       checked={Boolean(formData.isContentMasked ?? formData.isConfidential ?? false)}
+                      disabled={!canEditCaseConfidentiality}
                       onChange={(e) => {
                         const val = e.target.checked;
                         handleFieldChange('isContentMasked', val);

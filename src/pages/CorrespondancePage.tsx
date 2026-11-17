@@ -1,5 +1,5 @@
 import React, { FC, useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase';
 import { 
     dbCreateDoc, 
@@ -70,33 +70,39 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
     const [piecesJointes, setPiecesJointes] = useState<Array<{ name: string; size: string; content?: string }>>([]);
     const [filterNature, setFilterNature] = useState<string>('All');
 
-    // Helper to generate IDs according to firm conventions
-    const generateCorrespondenceId = (nat: 'Émise' | 'Reçue / Perçue', caseId?: string) => {
-        if (nat === 'Reçue / Perçue') {
-            const randNum = Math.floor(1000 + Math.random() * 9000);
-            if (caseId && caseId.trim()) {
-                const cleanCase = caseId.trim().replace(/\s+/g, '-');
-                return `KBB-RECEPT-${cleanCase}-${randNum}`;
-            } else {
-                return `KBB-RECEPT-${randNum}`;
-            }
-        } else {
-            const year = new Date().getFullYear();
-            let nextSeq = 1;
-            if (correspondances && correspondances.length > 0) {
-                const nums = correspondances.map(c => {
-                    const match = c.id.match(/(\d+)$/);
-                    return match ? parseInt(match[1], 10) : 0;
-                }).filter(n => !isNaN(n));
-                if (nums.length > 0) {
-                    nextSeq = Math.max(...nums) + 1;
-                } else {
-                    nextSeq = correspondances.length + 1;
-                }
-            }
-            const seqStr = String(nextSeq).padStart(4, '0');
-            return `KBB-DOS-${year}-${seqStr}`;
+    const correspondenceYear = new Date().getFullYear();
+    const getCaseReference = (caseId?: string) => caseId?.trim() || 'HORS-DOSSIER';
+    const getHighestSequence = (year: number) => correspondances.reduce((highest, correspondence) => {
+        const match = correspondence.id?.match(new RegExp(`^KBB - .+ - ${year} - (\\d+)$`));
+        return match ? Math.max(highest, Number(match[1]) || 0) : highest;
+    }, 19);
+    const generateCorrespondenceId = (_nature: 'Émise' | 'Reçue / Perçue', caseId?: string) =>
+        `KBB - ${getCaseReference(caseId)} - ${correspondenceYear} - ${getHighestSequence(correspondenceYear) + 1}`;
+
+    const reserveCorrespondenceSequence = async (year: number) => {
+        const sequenceRef = doc(db, 'correspondance_sequences', String(year));
+        const sequenceSnapshot = await getDoc(sequenceRef);
+        let lastSequence = Number(sequenceSnapshot.data()?.lastSequence);
+
+        if (!sequenceSnapshot.exists()) {
+            const existingCorrespondances = await getDocs(collection(db, 'correspondances'));
+            lastSequence = existingCorrespondances.docs.reduce((highest, correspondenceDoc) => {
+                const correspondence = correspondenceDoc.data() as Correspondance;
+                const id = String(correspondence.id || correspondenceDoc.id);
+                const match = id.match(new RegExp(`^KBB - .+ - ${year} - (\\d+)$`));
+                return match ? Math.max(highest, Number(match[1]) || 0) : highest;
+            }, 19);
         }
+
+        return runTransaction(db, async (transaction) => {
+            const currentSequence = await transaction.get(sequenceRef);
+            const currentLastSequence = currentSequence.exists()
+                ? Number(currentSequence.data()?.lastSequence)
+                : lastSequence;
+            const nextSequence = Math.max(19, Number.isFinite(currentLastSequence) ? currentLastSequence : 19) + 1;
+            transaction.set(sequenceRef, { year, lastSequence: nextSequence });
+            return nextSequence;
+        });
     };
 
     // Auto-generate or update correspondence ID in real-time
@@ -220,38 +226,39 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
 
         const finalContent = content.trim() || subject.trim() || "Correspondance enregistrée";
 
-        const isEditing = !!selectedCorr;
-        const id = selectedCorr ? selectedCorr.id : (customId || generateCorrespondenceId(nature, selectedCaseId));
-        const date = selectedCorr ? selectedCorr.date : new Date().toISOString().split('T')[0];
-        const author = selectedCorr ? selectedCorr.author : (currentUserInfo?.name || "Cabinet KBB");
-
         const effRecipientName = nature === 'Reçue / Perçue' 
             ? (expediteurExterne.trim() || recipientName.trim()) 
             : recipientName.trim();
 
-        const data: Correspondance = {
-            id,
-            date,
-            nature,
-            type: formType,
-            recipientName: effRecipientName,
-            destinataireCabinet: destinataireCabinet.trim() || undefined,
-            expediteurExterne: expediteurExterne.trim() || undefined,
-            recipientEmail,
-            destinataire: destinataire || undefined,
-            avocatSignataireId: nature === 'Émise' ? (avocatSignataireId || undefined) : undefined,
-            dateEmission: dateEmission || undefined,
-            dateReception: dateReception || (nature === 'Reçue / Perçue' ? new Date().toISOString().split('T')[0] : undefined),
-            subject,
-            content: finalContent,
-            status: nature === 'Reçue / Perçue' ? (status === 'Brouillon' ? 'Reçu' : status) : status,
-            author,
-            caseId: selectedCaseId || undefined,
-            procedureId: selectedProcedureId || undefined,
-            piecesJointes
-        };
-
         try {
+            const isEditing = !!selectedCorr;
+            const id = selectedCorr?.id || `KBB - ${getCaseReference(selectedCaseId)} - ${correspondenceYear} - ${await reserveCorrespondenceSequence(correspondenceYear)}`;
+            const date = selectedCorr?.date || new Date().toISOString().split('T')[0];
+            const author = selectedCorr?.author || currentUserInfo?.name || "Cabinet KBB";
+            setCustomId(id);
+
+            const data: Correspondance = {
+                id,
+                date,
+                nature,
+                type: formType,
+                recipientName: effRecipientName,
+                destinataireCabinet: destinataireCabinet.trim() || undefined,
+                expediteurExterne: expediteurExterne.trim() || undefined,
+                recipientEmail,
+                destinataire: destinataire || undefined,
+                avocatSignataireId: nature === 'Émise' ? (avocatSignataireId || undefined) : undefined,
+                dateEmission: dateEmission || undefined,
+                dateReception: dateReception || (nature === 'Reçue / Perçue' ? new Date().toISOString().split('T')[0] : undefined),
+                subject,
+                content: finalContent,
+                status: nature === 'Reçue / Perçue' ? (status === 'Brouillon' ? 'Reçu' : status) : status,
+                author,
+                caseId: selectedCaseId || undefined,
+                procedureId: selectedProcedureId || undefined,
+                piecesJointes
+            };
+
             if (isEditing) {
                 await dbUpdateDoc('correspondances', id, data);
                 triggerLocalToast('success', "Correspondance mise à jour !");
@@ -974,19 +981,8 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
                                         <div>
                                             <div className="flex justify-between items-center">
                                                 <label className="text-[10px] uppercase font-bold text-slate-400">
-                                                    Réf. ID Unique {nature === 'Reçue / Perçue' ? '(Format KBB-RECEPT)' : '(Format KBB-DOS)'}
+                                                    Réf. ID Unique (attribuée automatiquement)
                                                 </label>
-                                                {!selectedCorr && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setCustomId(generateCorrespondenceId(nature, selectedCaseId))}
-                                                        className="text-[10px] text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 font-bold flex items-center gap-1 cursor-pointer"
-                                                        title="Générer un nouveau numéro aléatoire"
-                                                    >
-                                                        <span>🎲</span>
-                                                        <span>Régénérer</span>
-                                                    </button>
-                                                )}
                                             </div>
                                             <div className="relative mt-1.5">
                                                 <input
@@ -997,9 +993,7 @@ export const CorrespondancePage: FC<CorrespondancePageProps> = ({
                                                 />
                                             </div>
                                             <p className="text-[9px] text-slate-400 mt-1">
-                                                {nature === 'Reçue / Perçue' 
-                                                    ? (selectedCaseId ? 'Format : KBB-RECEPT-[id dossier]-[numéro aléatoire]' : 'Format : KBB-RECEPT-[numéro aléatoire]')
-                                                    : 'Format : KBB-DOS-[année]-[séquence]'}
+                                                Format : KBB - {getCaseReference(selectedCaseId)} - {correspondenceYear} - {getHighestSequence(correspondenceYear) + 1}. Le numéro est réservé à l'enregistrement.
                                             </p>
                                         </div>
 

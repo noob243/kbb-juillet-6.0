@@ -1,6 +1,7 @@
 import React, { FC, useState } from 'react';
 import PageContainer from '../components/PageContainer';
 import ClientModal from '../components/modals/ClientModal';
+import { DetailedEditModal } from '../components/DetailedEditModal';
 import { 
   Phone, 
   Mail, 
@@ -15,7 +16,8 @@ import {
   ChevronRight,
   ShieldCheck,
   UserCheck,
-  Download
+  Download,
+  Pencil
 } from 'lucide-react';
 import { Client, Case, Invoice, Task } from '../types';
 import { isActiveCase, isCaseForClient } from '../utils/caseHelpers';
@@ -29,6 +31,7 @@ interface ClientsPageProps {
   invoices?: Invoice[];
   tasks?: Task[];
   onAddClient: (client: Omit<Client, 'id'> & { id?: string | number }) => void;
+  onUpdateClient: (client: Client) => void;
   onExport: () => void;
   onSendEmail: (to: string, subject: string, body: string, recipientName?: string, attachmentName?: string) => void;
 }
@@ -42,6 +45,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
   invoices = [], 
   tasks = [], 
   onAddClient, 
+  onUpdateClient,
   onExport, 
   onSendEmail 
 }) => {
@@ -52,6 +56,7 @@ const ClientsPage: FC<ClientsPageProps> = ({
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [selectedCase, setSelectedCase] = useState<Case | null>(null);
+    const [editingClient, setEditingClient] = useState<Client | null>(null);
 
     // Dynamic industry & contact info helper
     const getClientDetails = (client: Client) => {
@@ -199,6 +204,15 @@ const ClientsPage: FC<ClientsPageProps> = ({
                                                     Voir fiche
                                                 </button>
                                                 <button
+                                                    type="button"
+                                                    onClick={() => setEditingClient(client)}
+                                                    className="inline-flex items-center gap-1 text-slate-600 hover:text-indigo-700 bg-slate-50 hover:bg-indigo-50 px-2.5 py-1.5 rounded-xl transition cursor-pointer border border-slate-100 text-xs font-bold"
+                                                    title={`Modifier ${client.name}`}
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                    Modifier
+                                                </button>
+                                                <button
                                                     onClick={() => {
                                                         onSendEmail(
                                                             details.email,
@@ -231,6 +245,19 @@ const ClientsPage: FC<ClientsPageProps> = ({
             </PageContainer>
             
             <ClientModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={onAddClient} existingClients={clients} />
+            {editingClient && (
+                <DetailedEditModal
+                    type="client"
+                    item={editingClient}
+                    clients={clients}
+                    avocats={[]}
+                    onClose={() => setEditingClient(null)}
+                    onSave={(updated) => {
+                        onUpdateClient(updated);
+                        setEditingClient(null);
+                    }}
+                />
+            )}
 
             {/* Client Details Modal */}
             {selectedClient && (() => {

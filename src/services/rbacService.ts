@@ -171,6 +171,9 @@ export function hasPermission(user: AppUser | null, moduleKey: ModuleKey): boole
     return canDeleteRecord(user);
   }
 
+  // Client and case records are shared with every active application user.
+  if (moduleKey === 'clients' || moduleKey === 'cases') return true;
+
   // Primary Super Admin check
   const userEmail = (user.email || '').trim().toLowerCase();
   const isSuperAdmin = user.role === 'Admin' ||
